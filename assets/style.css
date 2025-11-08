@@ -92,6 +92,23 @@ body{
 #shorten-btn.secondary{background:#f8f9fa;color:#202124;border:1px solid #dadce0}
 #url-input:focus{box-shadow:0 0 0 4px rgba(26,115,232,0.12);border-radius:999px}
 
+/* 검색박스 내 버튼을 단축 생성 버튼과 동일하게 보이도록 강제 */
+.search-box .btn{
+	/* 단축 생성 버튼과 동일한 높이/패딩/정렬 보정 */
+	height:44px;
+	padding:10px 16px;
+	border-radius:8px;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	border:none;
+	box-sizing:border-box;
+	background:#1a73e8;
+	color:#fff;
+	cursor:pointer;
+	font-weight:600;
+}
+
 /* 노트 및 상태 메시지 중앙 정렬 */
 .note{margin-top:8px;color:#555;font-size:13px;text-align:center}
 .status{margin-top:10px;color:#444;font-size:13px;text-align:center}
@@ -141,3 +158,100 @@ body{
 		padding:6px 8px;
 		font-size:12px;
 	}
+
+/* 숨김 클래스 */
+.hidden{display:none !important}
+
+/* 결과 박스 스타일 */
+.result-box{
+	width:100%;
+	max-width:720px;
+	padding:14px;
+	border-radius:12px;
+	background:#f7fbff;
+	border:1px solid #e6f3ff;
+	text-align:center;
+	box-sizing:border-box;
+}
+.result-box a{color:#1a73e8;font-weight:600;text-decoration:none}
+
+/* 통합: #shorten-btn 및 결과/복사/새로만들기 버튼을 동일한 스타일로 맞춤 */
+#shorten-btn,
+.btn.primary,
+.search-box .btn,
+.result-actions .btn {
+	-webkit-appearance: none;
+	appearance: none;
+	background: #1a73e8;
+	color: #fff;
+	border: none;
+	padding: 10px 16px;
+	border-radius: 8px;
+	cursor: pointer;
+	font-weight: 600;
+	font-size: 14px;
+	line-height: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 44px; /* 일관된 높이 유지 */
+	box-sizing: border-box;
+	transition: background 120ms ease, box-shadow 120ms ease, transform 80ms ease;
+}
+
+#shorten-btn:hover,
+.btn.primary:hover,
+.search-box .btn:hover,
+.result-actions .btn:hover {
+	background: #1558c0;
+}
+
+#shorten-btn:active,
+.btn.primary:active,
+.search-box .btn:active,
+.result-actions .btn:active {
+	transform: translateY(1px);
+}
+
+#shorten-btn:focus,
+.btn.primary:focus,
+.search-box .btn:focus,
+.result-actions .btn:focus {
+	outline: none;
+	box-shadow: 0 0 0 4px rgba(26,115,232,0.12);
+}
+
+/* secondary 버튼(새로 만들기 등)도 일관되게 보이도록 보정 */
+.btn.secondary,
+.search-box .btn.secondary,
+.result-actions .btn.secondary {
+	background: #f8f9fa;
+	color: #202124;
+	border: 1px solid #dadce0;
+	padding: 10px 16px;
+	height: 44px;
+	border-radius: 8px;
+	box-sizing: border-box;
+}
+
+/* 모바일에서 버튼 높이/배치 조정 */
+@media (max-width:560px){
+	#shorten-btn,
+	.btn.primary,
+	.btn.secondary,
+	.search-box .btn,
+	.result-actions .btn {
+		height: auto;
+		width: 100%;
+		padding: 10px 12px;
+	}
+	.result-actions{flex-direction:column;width:100%}
+}
+
+/* result-inline 내부 버튼 간격/반응형 보정 */
+.result-inline .btn{margin-left:6px}
+@media (max-width:560px){
+	.result-inline{flex-direction:column;align-items:stretch}
+	.result-inline a{word-break:break-word}
+	.result-inline .btn{margin-left:0;width:100%}
+}

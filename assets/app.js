@@ -1,11 +1,50 @@
-const urlInput = document.getElementById('url-input');
-const shortenBtn = document.getElementById('shorten-btn');
-const msg = document.getElementById('msg');
 const API_BASE = 'https://res302.gate1253.workers.dev';
+// 메시지 영역
+const msg = document.getElementById('msg');
+// 검색 폼 컨테이너
+const searchBox = document.querySelector('.search-box');
 
-shortenBtn.addEventListener('click', async () => {
+// 렌더: 입력 폼 (input + 단축 버튼)
+function renderForm() {
+	searchBox.innerHTML = `
+		<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com/long/path)" aria-label="원본 URL" />
+		<button id="shorten-btn" type="button" class="btn primary">단축 생성</button>
+	`;
+	msg.textContent = '';
+	document.getElementById('shorten-btn').addEventListener('click', handleShorten);
+	document.getElementById('url-input').focus();
+}
+
+// 렌더: 결과 (링크는 왼쪽, 버튼들은 오른쪽에 동일한 위치/스타일)
+function renderResult(shortUrl){
+	searchBox.innerHTML = `
+		<div class="result-left" style="flex:1;min-width:0">
+			<a href="${shortUrl}" target="_blank" rel="noopener noreferrer" id="result-link" style="font-weight:600;color:#1a73e8;word-break:break-all;">${shortUrl}</a>
+		</div>
+		<div class="result-actions" style="display:flex;gap:8px;align-items:center">
+			<button id="copy-btn" class="btn primary" type="button">복사</button>
+			<button id="create-new" class="btn primary" type="button">새로 만들기</button>
+		</div>
+	`;
+	// 복사 동작
+	document.getElementById('copy-btn').addEventListener('click', async () => {
+		try{
+			await navigator.clipboard.writeText(shortUrl);
+			msg.textContent = '단축 URL이 클립보드에 복사되었습니다.';
+		}catch(e){
+			msg.textContent = '복사 실패: 브라우저가 클립보드를 지원하지 않음';
+		}
+	});
+	// 새로 만들기: 폼 복원
+	document.getElementById('create-new').addEventListener('click', () => {
+		renderForm();
+	});
+}
+
+// 단축 생성 핸들러
+async function handleShorten(){
+	const urlInput = document.getElementById('url-input');
 	const url = urlInput.value.trim();
-	// alias는 비회원이 제공하지 않으므로 전송하지 않음
 	if(!url){ msg.textContent = 'URL을 입력하세요.'; return; }
 	msg.textContent = '요청 중...';
 	try{
@@ -19,10 +58,16 @@ shortenBtn.addEventListener('click', async () => {
 			msg.textContent = data.error || '생성 실패';
 			return;
 		}
-		msg.innerHTML = `단축 URL 생성: <a href="${data.shortUrl}" target="_blank" rel="noopener noreferrer">${data.shortUrl}</a>`;
-		urlInput.value = '';
+		// 성공: 결과로 대체 (버튼들은 오른쪽, 단축 생성 버튼과 동일한 스타일/위치)
+		renderResult(data.shortUrl);
+
+		// 완료 후 '요청 중...' 메시지 제거
+		msg.textContent = '';
 	}catch(e){
 		msg.textContent = '요청 중 오류';
 		console.error(e);
 	}
-});
+}
+
+// 초기 렌더
+renderForm();
