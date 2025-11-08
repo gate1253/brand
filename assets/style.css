@@ -1,0 +1,26 @@
+:root{
+	font-family: Inter, Roboto, Arial, sans-serif;
+	color:#202124;
+	background:#fff;
+}
+html,body{height:100%}
+body{
+	display:flex;
+	justify-content:center;
+	align-items:flex-start;
+	padding-top:8vh;
+}
+main{
+	width:640px;
+	text-align:center;
+}
+h1{font-size:48px;margin:0 0 24px}
+.shorten{display:flex;gap:8px;justify-content:center;margin-bottom:20px}
+.shorten input[type="url"]{width:360px;padding:12px;border:1px solid #e0e0e0;border-radius:4px}
+.shorten input[type="text"]{width:160px;padding:12px;border:1px solid #e0e0e0;border-radius:4px}
+.shorten button{padding:12px 18px;border:none;background:#1a73e8;color:#fff;border-radius:4px;cursor:pointer}
+#msg{margin-top:8px;color:#555;font-size:14px}
+.list{margin-top:24px;text-align:left}
+.list ul{list-style:none;padding:0}
+.list li{padding:8px 0;border-bottom:1px solid #f0f0f0}
+.list a.short{font-weight:600;color:#1a73e8;text-decoration:none;margin-right:8px}
