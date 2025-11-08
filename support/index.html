@@ -1,102 +1,198 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>RES302 · Support / API 사용 예제</title>
-  <link rel="stylesheet" href="/assets/style.css" />
-  <style>
-    body{font-family:Inter, Roboto, Arial, sans-serif;background:#f5f7fb;color:#222;margin:0;padding:24px}
-    .wrap{max-width:900px;margin:24px auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(20,30,60,0.06)}
-    pre{background:#f7f9fc;padding:12px;border-radius:6px;overflow:auto}
-    .demo{margin-top:12px;display:flex;gap:8px;align-items:center}
-    .demo input{flex:1;padding:8px;border:1px solid #e6eaf0;border-radius:6px}
-    .demo button{padding:8px 12px;border:none;background:#1a73e8;color:#fff;border-radius:6px;cursor:pointer}
-    .result{margin-top:12px;font-size:14px;color:#111}
-    a.back{display:inline-block;margin-bottom:12px;color:#1a73e8;text-decoration:none}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RES302 · Support / API 사용 예제</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  body{font-family:Inter, Roboto, Arial, sans-serif;background:#f5f7fb;color:#222;margin:0;padding:24px}
+  .wrap{max-width:900px;margin:24px auto;padding:20px;background:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(20,30,60,0.06)}
+  pre{background:#f7f9fc;padding:12px;border-radius:6px;overflow:auto;font-size:14px}
+  .demo-section{margin-top:12px;padding:15px;border:1px solid #eef3fb;border-radius:8px;background:#fcfdff}
+  .demo-inputs{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+  .demo-inputs input{padding:10px;border:1px solid #e6eaf0;border-radius:6px;font-size:14px}
+  .demo-actions{display:flex;gap:8px;align-items:center}
+  .demo-actions button{padding:10px 14px;border:none;background:#1a73e8;color:#fff;border-radius:6px;cursor:pointer;font-weight:600}
+  .demo-result{margin-top:12px;font-size:14px;color:#111;word-break:break-all}
+  a.back{display:inline-block;margin-bottom:12px;color:#1a73e8;text-decoration:none}
+</style>
 </head>
 <body>
   <div class="wrap" role="main">
     <a class="back" href="/" aria-label="홈으로 돌아가기">← 홈으로 돌아가기</a>
     <h1>API 사용 예제</h1>
     <p>단축 URL 생성 API 엔드포인트: <code>https://res302.gate1253.workers.dev/api/shorten</code></p>
+    <p>로그인 사용자(커스텀 코드)는 API 키를 <code>Authorization: Bearer &lt;YOUR_API_KEY&gt;</code> 헤더에 포함해야 합니다. <code>uniqueUserId</code>는 API 키를 통해 워커에서 자동으로 검증됩니다.</p>
 
-    <h2>1) curl 예제</h2>
+    <h2>1) 로그인 사용자 예제 (커스텀 코드)</h2>
     <pre><code>curl -X POST "https://res302.gate1253.workers.dev/api/shorten" \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com/long/path"}'
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \
+  -d '{
+    "url":"https://example.com/long/path/to/resource",
+    "alias":"mycustomcode"
+  }'
 </code></pre>
-    <p>응답 예시:</p>
+    <p>응답 예시 (커스텀 코드):</p>
     <pre><code>{
   "ok": true,
-  "code": "a1B2c3",
-  "shortUrl": "https://res302.gate1253.workers.dev/a1B2c3"
+  "code": "YOUR_UNIQUE_USER_ID/mycustomcode",
+  "shortUrl": "https://res302.gate1253.workers.dev/YOUR_UNIQUE_USER_ID/mycustomcode",
+  "message": "단축 URL이 생성되었습니다."
 }
 </code></pre>
 
-    <h2>2) JavaScript (fetch) 예제</h2>
-    <pre><code>const API_BASE = 'https://res302.gate1253.workers.dev';
+    <h2>1.1) 비회원 예제 (무작위 코드)</h2>
+    <pre><code>curl -X POST "https://res302.gate1253.workers.dev/api/shorten" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url":"https://example.com/another/long/path"
+  }'
+</code></pre>
+    <p>응답 예시 (무작위 코드):</p>
+    <pre><code>{
+  "ok": true,
+  "code": "a1B2c3",
+  "shortUrl": "https://res302.gate1253.workers.dev/a1B2c3",
+  "message": "단축 URL이 생성되었습니다."
+}
+</code></pre>
 
-async function shorten(url, alias) {
-  const body = alias ? { url, alias } : { url };
+    <h2>2) JavaScript (fetch) 예제 (로그인 사용자 - 커스텀 코드)</h2>
+    <pre><code>const API_BASE = 'https://res302.gate1253.workers.dev';
+const YOUR_API_KEY = 'YOUR_API_KEY_HERE'; // 실제 API 키로 교체
+
+async function shortenWithCustomCode(originalUrl, customAlias) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (YOUR_API_KEY) {
+    headers['Authorization'] = `Bearer ${YOUR_API_KEY}`;
+  }
+
+  const body = {
+    url: originalUrl,
+    alias: customAlias
+  };
+
   const res = await fetch(`${API_BASE}/api/shorten`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     body: JSON.stringify(body)
   });
   return res.json();
 }
 
 // 사용 예:
-shorten('https://example.com/long/path')
+shortenWithCustomCode('https://example.com/long/path/to/resource', 'mycustomcode')
+  .then(data => console.log(data))
+  .catch(err => console.error(err));
+</code></pre>
+
+    <h2>2.1) JavaScript (fetch) 예제 (비회원 - 무작위 코드)</h2>
+    <pre><code>const API_BASE = 'https://res302.gate1253.workers.dev';
+
+async function shortenAnonymous(originalUrl) {
+  const headers = { 'Content-Type': 'application/json' };
+  const body = { url: originalUrl };
+
+  const res = await fetch(`${API_BASE}/api/shorten`, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// 사용 예:
+shortenAnonymous('https://example.com/another/long/path')
   .then(data => console.log(data))
   .catch(err => console.error(err));
 </code></pre>
     <p>참고: 브라우저에서 다른 오리진으로 호출할 경우 CORS preflight(OPTIONS)가 발생합니다. 서비스는 기본적으로 모든 오리진을 허용하도록 설정되어 있지만, 필요 시 도메인 제한을 적용하세요.</p>
 
     <h2>3) 페이지 내 데모</h2>
-    <div class="demo" aria-live="polite">
-      <input id="demo-url" type="url" placeholder="https://example.com/long/path" />
-      <button id="demo-btn">단축 생성</button>
+    <div class="demo-section">
+      <div class="demo-inputs">
+        <input id="demo-url" type="url" placeholder="원본 URL (예: https://example.com/long/path)" />
+        <input id="demo-api-key" type="text" placeholder="API Key (커스텀 코드 사용 시 필수, 비회원은 비워두세요)" />
+        <input id="demo-alias" type="text" placeholder="커스텀 코드 (선택 사항, 비회원은 비워두세요)" />
+      </div>
+      <div class="demo-actions">
+        <button id="demo-btn">단축 생성</button>
+        <button id="demo-reset-btn" style="background:#f8f9fa;color:#202124;border:1px solid #dadce0;">초기화</button>
+      </div>
+      <div id="demo-result" class="demo-result" role="status"></div>
     </div>
-    <div id="demo-result" class="result" role="status"></div>
 
     <script>
       (function(){
         const API_BASE = 'https://res302.gate1253.workers.dev';
         const btn = document.getElementById('demo-btn');
-        const input = document.getElementById('demo-url');
+        const resetBtn = document.getElementById('demo-reset-btn');
+        const urlInput = document.getElementById('demo-url');
+        const apiKeyInput = document.getElementById('demo-api-key');
+        const aliasInput = document.getElementById('demo-alias');
         const out = document.getElementById('demo-result');
 
+        function resetDemo() {
+          urlInput.value = '';
+          apiKeyInput.value = '';
+          aliasInput.value = '';
+          out.textContent = '';
+          urlInput.focus();
+        }
+
         btn.addEventListener('click', async () => {
-          const url = input.value.trim();
-          if(!url){ out.textContent = 'URL을 입력하세요.'; return; }
+          const url = urlInput.value.trim();
+          const apiKey = apiKeyInput.value.trim();
+          const alias = aliasInput.value.trim();
+
+          if(!url){ out.textContent = '원본 URL을 입력하세요.'; return; }
           out.textContent = '요청 중...';
+
+          const headers = { 'Content-Type': 'application/json' };
+          const requestBody = { url: url };
+
+          if (alias) { // 커스텀 코드 사용 시
+            if (!apiKey) {
+              out.textContent = '커스텀 코드 사용 시 API Key는 필수입니다.';
+              return;
+            }
+            headers['Authorization'] = `Bearer ${apiKey}`;
+            requestBody.alias = alias;
+          } else { // 무작위 코드 사용 시 (API Key는 있어도 무시됨)
+            // 비회원 요청이므로 Authorization 헤더를 보내지 않음
+            // 만약 API Key가 입력되어 있다면, 이는 무시됩니다.
+          }
+
           try{
             const res = await fetch(`${API_BASE}/api/shorten`, {
               method: 'POST',
-              headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({ url })
+              headers: headers,
+              body: JSON.stringify(requestBody)
             });
             const data = await res.json();
             if(!res.ok){
               out.textContent = data.error || '생성 실패';
+              console.error('API Error:', data);
               return;
             }
-            out.innerHTML = '완료: <a href="' + data.shortUrl + '" target="_blank" rel="noopener noreferrer">' + data.shortUrl + '</a>';
-            input.value = '';
+            out.innerHTML = `완료: <a href="${data.shortUrl}" target="_blank" rel="noopener noreferrer">${data.shortUrl}</a> (메시지: ${data.message || '성공'})`;
           }catch(e){
             out.textContent = '요청 중 오류';
             console.error(e);
           }
         });
+
+        resetBtn.addEventListener('click', resetDemo);
+        resetDemo(); // 페이지 로드 시 초기화
       })();
     </script>
 
     <h3>추가 안내</h3>
     <ul>
-      <li>비회원은 커스텀 alias 전송 시 서버에서 거절될 수 있습니다(권한 필요).</li>
+      <li>**로그인 사용자**: 커스텀 코드(alias)를 사용하려면 로그인하여 발급받은 API Key를 <code>Authorization: Bearer &lt;YOUR_API_KEY&gt;</code> 헤더에 포함해야 합니다. <code>uniqueUserId</code>는 API 키를 통해 워커에서 자동으로 검증됩니다.</li>
+      <li>**비회원**: API Key와 커스텀 코드(alias)를 비워두면 무작위 단축 URL이 생성됩니다.</li>
       <li>대량 요청 시 rate limit이 적용될 수 있습니다. 자동화 전 관리자에게 문의하세요.</li>
     </ul>
   </div>

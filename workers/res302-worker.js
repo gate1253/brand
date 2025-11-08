@@ -68,7 +68,7 @@ async function validateApiKey(request, env) {
 async function handleShorten(req, env){
 	try{
 		const body = await req.json();
-		let {url, alias, uniqueUserId: clientUniqueUserId} = body; // uniqueUserId도 body에서 받음
+		let {url, alias} = body; // 변경: uniqueUserId를 body에서 받지 않음
 		if(!url) return jsonResponse({error:'url 필요'}, 400);
 		// 간단한 url 보정
 		if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
@@ -78,17 +78,15 @@ async function handleShorten(req, env){
 		let operationType = 'create'; // 'create' 또는 'update'
 
 		if(alias){ // 커스텀 코드가 제공된 경우
-			const user = await validateApiKey(req, env);
+			const user = await validateApiKey(req, env); // user 객체에 uniqueUserId 포함
 			if (!user) {
 				return jsonResponse({error: '인증되지 않았거나 유효하지 않은 API 키입니다.'}, 401);
 			}
-            // API 키로 검증된 사용자의 uniqueUserId와 요청 본문의 uniqueUserId가 일치하는지 확인
-            if (user.uniqueUserId !== clientUniqueUserId) {
-                return jsonResponse({error: 'API 키와 사용자 ID가 일치하지 않습니다.'}, 403);
-            }
+            // 변경: API 키로 검증된 사용자의 uniqueUserId를 직접 사용
+            const uniqueUserIdFromApiKey = user.uniqueUserId;
 
             code = alias.trim(); // alias를 실제 코드로 사용
-            fullRedirectPath = `${clientUniqueUserId}/${code}`; // 리다이렉트 경로
+            fullRedirectPath = `${uniqueUserIdFromApiKey}/${code}`; // 리다이렉트 경로에 검증된 uniqueUserId 사용
             
             // KV에서 사용자별 alias 존재 여부 확인
             const existingUrl = await env.RES302_KV.get(fullRedirectPath); // KV 키 변경

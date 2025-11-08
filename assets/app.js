@@ -75,7 +75,7 @@ async function handleShorten(){
 			alias = aliasInput.value.trim();
 			if (alias) {
 				requestBody.alias = alias;
-				requestBody.uniqueUserId = user.uniqueUserId; // uniqueUserId 추가
+				// 변경: uniqueUserId를 요청 본문에 포함시키지 않음. Worker에서 API 키로 검증.
 			}
 		}
 	}
