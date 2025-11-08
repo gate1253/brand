@@ -81,29 +81,34 @@
       throw new Error('worker_auth_failed: ' + txt);
     }
 
-    // 워커는 { tokens, profile, apiKey } 객체를 반환해야 합니다.
+    // 워커는 { tokens, profile, apiKey, uniqueUserId } 객체를 반환해야 합니다.
     const data = await res.json();
-    const { tokens, profile, apiKey } = data; // apiKey를 여기서 한 번만 구조 분해 할당
+    const { tokens, profile, apiKey, uniqueUserId } = data; // apiKey를 여기서 한 번만 구조 분해 할당
 
     // tokens, profile, apiKey 모두 존재하는지 확인
-    if (!tokens || !profile || !apiKey) {
+    if (!tokens || !profile) {
       throw new Error('worker_invalid_response: ' + JSON.stringify(data));
     }
 
-    // persist tokens/profile/apiKey (short-lived)
-    localStorage.setItem('res302_tokens', JSON.stringify({tokens, profile, apiKey, ts: Date.now()}));
+    // 변경: 워커로부터 받은 apiKey와 uniqueUserId도 함께 저장
+    if (!apiKey || !uniqueUserId) {
+        throw new Error('worker_invalid_response: API Key 또는 uniqueUserId가 누락되었습니다.');
+    }
+
+    // persist tokens/profile/apiKey/uniqueUserId (short-lived)
+    localStorage.setItem('res302_tokens', JSON.stringify({tokens, profile, apiKey, uniqueUserId, ts: Date.now()}));
     // cleanup pkce
     localStorage.removeItem('res302_pkce');
     // optionally redirect to member area or return profile
-    return profile; // 프로필만 반환해도 되지만, localStorage에는 apiKey가 저장됨
+    return profile; // 프로필만 반환해도 되지만, localStorage에는 모든 정보가 저장됨
   };
 
   // helper to get current user
   window.getCurrentUser = function(){
     try{
       const s = JSON.parse(localStorage.getItem('res302_tokens') || '{}');
-      // 변경: 프로필과 함께 apiKey도 반환
-      return s.profile ? { ...s.profile, apiKey: s.apiKey } : null;
+      // 변경: 프로필과 함께 apiKey, uniqueUserId도 반환
+      return s.profile ? { ...s.profile, apiKey: s.apiKey, uniqueUserId: s.uniqueUserId } : null;
     }catch(e){ return null; }
   };
 

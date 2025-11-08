@@ -7,6 +7,17 @@ function makeCode(len=6){
 	return s;
 }
 
+// 추가: 12자리 고유 회원 ID 생성 함수
+function makeUniqueId(len = 12) {
+    const arr = new Uint8Array(Math.ceil(len * Math.log2(36) / 8)); // base36에 필요한 바이트 수 계산
+    crypto.getRandomValues(arr);
+    let s = '';
+    for (let i = 0; i < arr.length; i++) {
+        s += (arr[i] % 36).toString(36); // base36으로 변환
+    }
+    return s.slice(0, len);
+}
+
 // 추가: API 키 생성 함수 (더 긴 길이)
 function makeApiKey(len = 32) {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -39,91 +50,103 @@ async function validateApiKey(request, env) {
     }
     const apiKey = authHeader.slice(7); // "Bearer " 제거
 
-    // API_KEY_TO_SUB_KV에서 API 키로 사용자 sub를 찾음
-    const userSub = await env.API_KEY_TO_SUB_KV.get(apiKey);
-    if (!userSub) {
+    // API_KEY_TO_SUB_KV에서 API 키로 uniqueUserId를 찾음
+    const uniqueUserId = await env.API_KEY_TO_SUB_KV.get(apiKey);
+    if (!uniqueUserId) {
         return null; // 유효하지 않은 API 키
     }
 
-    // USER_KV에서 사용자 데이터 검증 (선택 사항이지만 보안 강화)
-    const userData = await env.USER_KV.get(`user:${userSub}`, { type: 'json' });
+    // USER_KV에서 uniqueUserId를 기반으로 사용자 데이터 검증
+    const userData = await env.USER_KV.get(`user:${uniqueUserId}`, { type: 'json' });
     if (!userData || userData.apiKey !== apiKey) {
         return null; // 사용자 데이터 불일치 또는 키 무효화
     }
-    return userData; // 유효한 사용자 데이터 반환
+    return userData; // 유효한 사용자 데이터 반환 (uniqueUserId 포함)
 }
 
 
 async function handleShorten(req, env){
 	try{
 		const body = await req.json();
-		let {url, alias} = body;
+		let {url, alias, uniqueUserId: clientUniqueUserId} = body; // uniqueUserId도 body에서 받음
 		if(!url) return jsonResponse({error:'url 필요'}, 400);
 		// 간단한 url 보정
 		if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
 		
-		let code = alias ? alias.trim() : null;
+		let code; // 최종적으로 KV에 저장될 코드 (alias 또는 랜덤)
+		let fullRedirectPath; // 응답 및 CODE_KEY에 저장될 전체 경로 (code 또는 uniqueUserId/alias)
 		let operationType = 'create'; // 'create' 또는 'update'
 
-		// alias가 제공된 경우 API 키 검증 필수
-		if(code){
+		if(alias){ // 커스텀 코드가 제공된 경우
 			const user = await validateApiKey(req, env);
 			if (!user) {
 				return jsonResponse({error: '인증되지 않았거나 유효하지 않은 API 키입니다.'}, 401);
 			}
-			// alias가 유효한 사용자에게만 허용되도록 추가 검증 가능 (예: alias가 사용자의 소유인지)
-			// 현재는 단순히 API 키만 검증하고 alias 사용을 허용
-			
-			const existingUrl = await env.RES302_KV.get(code);
-			if(existingUrl){
-				// alias가 이미 존재하면 업데이트 작업
-				operationType = 'update';
-				// URL이 동일하면 불필요한 쓰기 방지
-				if (existingUrl === url) {
-					const shortUrl = `${new URL(req.url).origin}/${code}`;
-					return jsonResponse({ok:true, code, shortUrl, message: 'URL이 이미 존재하며 변경사항이 없습니다.'}, 200);
-				}
-			} else {
-				// alias가 제공되었지만 존재하지 않음. 새 커스텀 alias 생성.
-				// 이 경우 충돌 검사는 필요 없음 (사용자가 명시적으로 지정했고, 현재 유일함).
-			}
-		}else{
-			// alias가 제공되지 않음, 무작위 코드 생성 (API 키 없이도 가능)
+            // API 키로 검증된 사용자의 uniqueUserId와 요청 본문의 uniqueUserId가 일치하는지 확인
+            if (user.uniqueUserId !== clientUniqueUserId) {
+                return jsonResponse({error: 'API 키와 사용자 ID가 일치하지 않습니다.'}, 403);
+            }
+
+            code = alias.trim(); // alias를 실제 코드로 사용
+            fullRedirectPath = `${clientUniqueUserId}/${code}`; // 리다이렉트 경로
+            
+            // KV에서 사용자별 alias 존재 여부 확인
+            const existingUrl = await env.RES302_KV.get(fullRedirectPath); // KV 키 변경
+            if(existingUrl){
+                operationType = 'update';
+                if (existingUrl === url) {
+                    return jsonResponse({ok:true, code: fullRedirectPath, shortUrl: `${new URL(req.url).origin}/${fullRedirectPath}`, message: 'URL이 이미 존재하며 변경사항이 없습니다.'}, 200);
+                }
+            }
+		}else{ // alias가 제공되지 않은 경우 (무작위 코드 생성)
+			// API 키 검증은 필수는 아니지만, 익명 사용자의 남용 방지를 위해 추가할 수 있음
+			// 현재는 익명 사용자도 무작위 코드 생성 허용
 			for(let i=0;i<6;i++){
 				const c = makeCode();
-				if(!(await env.RES302_KV.get(c))){
+				// KV에서 무작위 코드 존재 여부 확인 (글로벌)
+				if(!(await env.RES302_KV.get(c))){ // 기존처럼 짧은 코드 사용
 					code = c; break;
 				}
 			}
 			if(!code) code = makeCode(8); // 6번 시도 후에도 코드 생성 실패 시 대체
+            fullRedirectPath = code; // 리다이렉트 경로는 무작위 코드 자체
+            
+            // 무작위 코드의 경우 기존 URL 존재 여부 확인
+            const existingUrl = await env.RES302_KV.get(fullRedirectPath);
+            if(existingUrl){
+                // 무작위 코드는 업데이트 개념이 아님. 충돌 시 재시도해야 함.
+                // 이 로직은 makeCode 루프에서 이미 처리되므로, 여기에 도달하면 새 코드임.
+                // 만약 makeCode(8)로 생성된 코드가 충돌하면, 이 부분에서 에러 처리 필요.
+                // 현재 makeCode 루프가 충돌 방지 역할을 하므로, 여기서는 새 코드라고 가정.
+            }
 		}
 		
-		// KV에 URL 저장/업데이트
-		await env.RES302_KV.put(code, url);
+		// KV에 URL 저장/업데이트 (fullRedirectPath를 키로 사용)
+		await env.RES302_KV.put(fullRedirectPath, url);
 
 		// 메타 리스트(CODE_KEY) 업데이트
 		const raw = await env.RES302_KV.get(CODE_KEY);
 		let list = raw ? JSON.parse(raw) : [];
 
 		if (operationType === 'update') {
-			const index = list.findIndex(item => item.code === code);
+			const index = list.findIndex(item => item.code === fullRedirectPath); // fullRedirectPath로 찾음
 			if (index !== -1) {
 				list[index].url = url;
 				list[index].updatedAt = new Date().toISOString(); // 업데이트 시간 추가
 			} else {
-				// 이 경우는 발생하지 않아야 하지만, 리스트가 동기화되지 않은 경우를 대비해 추가
-				list.push({code, url, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()});
+				// 리스트에 없는 경우 추가 (새로운 커스텀 코드를 업데이트한 경우 등)
+				list.push({code: fullRedirectPath, url, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()});
 			}
 		} else { // operationType === 'create'
-			list.push({code, url, createdAt: new Date().toISOString()});
+			list.push({code: fullRedirectPath, url, createdAt: new Date().toISOString()});
 		}
 
 		await env.RES302_KV.put(CODE_KEY, JSON.stringify(list));
 		
-		const shortUrl = `${new URL(req.url).origin}/${code}`;
+		const shortUrl = `${new URL(req.url).origin}/${fullRedirectPath}`;
 		const status = operationType === 'update' ? 200 : 201;
 		const message = operationType === 'update' ? 'URL이 업데이트되었습니다.' : '단축 URL이 생성되었습니다.';
-		return jsonResponse({ok:true, code, shortUrl, message}, status);
+		return jsonResponse({ok:true, code: fullRedirectPath, shortUrl, message}, status);
 	}catch(e){
 		console.error('handleShorten error:', e); // 오류 로깅 추가
 		return jsonResponse({error:'서버 오류'}, 500);
@@ -200,18 +223,44 @@ async function handleAuthCallback(request, env) {
 			return jsonResponse({ error: 'Google 프로필 ID(sub)를 가져올 수 없습니다.' }, 500);
 		}
 
-		const userKey = `user:${profile.sub}`;
-		let userData = await env.USER_KV.get(userKey, { type: 'json' });
+		let uniqueUserId;
+		let userData;
 		let apiKey;
 
-		if (userData) {
-			// 기존 사용자: API 키 재사용 및 마지막 로그인 시간 업데이트
-			apiKey = userData.apiKey;
-			userData.lastLoginAt = new Date().toISOString();
+		// Google sub ID로 기존 사용자 조회
+		const existingUniqueUserId = await env.GOOGLE_SUB_TO_USER_ID_KV.get(profile.sub);
+
+		if (existingUniqueUserId) {
+			// 기존 사용자: uniqueUserId 사용
+			uniqueUserId = existingUniqueUserId;
+			const userKey = `user:${uniqueUserId}`;
+			userData = await env.USER_KV.get(userKey, { type: 'json' });
+
+			if (userData) {
+				// 기존 사용자 데이터가 있으면 API 키 재사용 및 마지막 로그인 시간 업데이트
+				apiKey = userData.apiKey;
+				userData.lastLoginAt = new Date().toISOString();
+			} else {
+				// 매핑은 있는데 USER_KV에 데이터가 없는 경우 (비정상 상태, 새로 생성)
+				console.warn(`User mapping exists for sub ${profile.sub} but no user data in USER_KV. Recreating.`);
+				apiKey = makeApiKey();
+				userData = {
+					uniqueUserId: uniqueUserId,
+					sub: profile.sub,
+					email: profile.email,
+					name: profile.name,
+					picture: profile.picture,
+					apiKey: apiKey,
+					createdAt: new Date().toISOString(),
+					lastLoginAt: new Date().toISOString(),
+				};
+			}
 		} else {
-			// 새 사용자: API 키 생성 및 사용자 정보 저장
+			// 새 사용자: uniqueUserId 생성 및 정보 저장
+			uniqueUserId = makeUniqueId(); // 12자리 고유 ID 생성
 			apiKey = makeApiKey(); // 새 API 키 생성
 			userData = {
+				uniqueUserId: uniqueUserId,
 				sub: profile.sub,
 				email: profile.email,
 				name: profile.name,
@@ -220,14 +269,17 @@ async function handleAuthCallback(request, env) {
 				createdAt: new Date().toISOString(),
 				lastLoginAt: new Date().toISOString(),
 			};
+			// Google sub ID -> uniqueUserId 매핑 저장
+			await env.GOOGLE_SUB_TO_USER_ID_KV.put(profile.sub, uniqueUserId);
 		}
-		await env.USER_KV.put(userKey, JSON.stringify(userData));
-		// 추가: API 키 -> sub 매핑 저장
-		await env.API_KEY_TO_SUB_KV.put(apiKey, profile.sub);
 
+		// USER_KV에 사용자 데이터 저장/업데이트
+		await env.USER_KV.put(`user:${uniqueUserId}`, JSON.stringify(userData));
+		// API 키 -> uniqueUserId 매핑 저장
+		await env.API_KEY_TO_SUB_KV.put(apiKey, uniqueUserId);
 
-		// 클라이언트에 토큰, 프로필 정보, API 키 반환
-		return jsonResponse({ tokens, profile, apiKey }, 200);
+		// 클라이언트에 토큰, 프로필 정보 (uniqueUserId 포함), API 키 반환
+		return jsonResponse({ tokens, profile: { ...profile, uniqueUserId }, apiKey }, 200);
 
 	} catch (e) {
 		console.error('Auth Callback Error:', e);
@@ -258,13 +310,25 @@ export async function handleRequest(request, env){
 	if(request.method === 'GET' && pathname === '/api/list'){
 		return handleList(env);
 	}
-	// 리다이렉트: GET /{code}
+	// 리다이렉트: GET /{code} 또는 /{uniqueUserId}/{code}
 	if(request.method === 'GET' && pathname.length > 1){
-		const code = pathname.slice(1).split('/')[0];
-		const target = await env.RES302_KV.get(code);
-		if(target){
-			// redirect 시에도 CORS 헤더 포함
-			return new Response(null, {status:302, headers: Object.assign({Location: target}, corsHeaders())});
+		const pathSegments = pathname.slice(1).split('/');
+		let targetCode = null; // KV에서 조회할 최종 키
+
+		if (pathSegments.length === 2) { // /{uniqueUserId}/{code} 패턴
+			const uniqueUserId = pathSegments[0];
+			const aliasCode = pathSegments[1];
+			// handleShorten에서 ${uniqueUserId}/${code}로 저장했으므로 그대로 사용
+			targetCode = `${uniqueUserId}/${aliasCode}`;
+		} else if (pathSegments.length === 1) { // /{code} 패턴
+			targetCode = pathSegments[0];
+		}
+
+		if (targetCode) {
+			const target = await env.RES302_KV.get(targetCode);
+			if(target){
+				return new Response(null, {status:302, headers: Object.assign({Location: target}, corsHeaders())});
+			}
 		}
 		return new Response('Not found', {status:404, headers: corsHeaders()});
 	}

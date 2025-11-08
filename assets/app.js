@@ -65,17 +65,21 @@ async function handleShorten(){
 	if(!url){ msg.textContent = 'URL을 입력하세요.'; return; }
 	msg.textContent = '요청 중...';
 
-	// 추가: 로그인 상태이고 커스텀 코드 입력 필드가 있으면 alias 값 가져오기
 	let alias = null;
 	const user = window.getCurrentUser();
+	let requestBody = { url }; // 기본 요청 본문
+
 	if (user) {
 		const aliasInput = document.getElementById('alias-input');
 		if (aliasInput) {
 			alias = aliasInput.value.trim();
+			if (alias) {
+				requestBody.alias = alias;
+				requestBody.uniqueUserId = user.uniqueUserId; // uniqueUserId 추가
+			}
 		}
 	}
 
-	// 추가: API 키를 Authorization 헤더에 포함
 	const headers = {'Content-Type':'application/json'};
 	if (user && user.apiKey) {
 		headers['Authorization'] = `Bearer ${user.apiKey}`;
@@ -85,7 +89,7 @@ async function handleShorten(){
 		const res = await fetch(`${API_BASE}/api/shorten`, {
 			method: 'POST',
 			headers: headers,
-			body: JSON.stringify({url, alias}) // alias를 API 요청 본문에 포함
+			body: JSON.stringify(requestBody) // 수정된 requestBody 사용
 		});
 		const data = await res.json();
 		if(!res.ok){
