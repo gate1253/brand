@@ -38,6 +38,8 @@ jobs:
           CF_USER_KV_NAMESPACE_ID: ${{ secrets.CF_USER_KV_NAMESPACE_ID }}
           # 추가: API_KEY_TO_SUB_KV 네임스페이스 ID
           CF_API_KEY_TO_SUB_KV_NAMESPACE_ID: ${{ secrets.CF_API_KEY_TO_SUB_KV_NAMESPACE_ID }}
+          # 추가: GOOGLE_SUB_TO_USER_ID_KV 네임스페이스 ID
+          CF_GOOGLE_SUB_TO_USER_ID_KV_NAMESPACE_ID: ${{ secrets.CF_GOOGLE_SUB_TO_USER_ID_KV_NAMESPACE_ID }}
         run: |
           # Use unquoted heredoc to allow shell variable expansion
           cat > wrangler.toml <<EOF
@@ -51,7 +53,9 @@ jobs:
             # 추가: USER_KV 바인딩
             { binding = "USER_KV", id = "${CF_USER_KV_NAMESPACE_ID}" },
             # 추가: API_KEY_TO_SUB_KV 바인딩
-            { binding = "API_KEY_TO_SUB_KV", id = "${CF_API_KEY_TO_SUB_KV_NAMESPACE_ID}" }
+            { binding = "API_KEY_TO_SUB_KV", id = "${CF_API_KEY_TO_SUB_KV_NAMESPACE_ID}" },
+            # 추가: GOOGLE_SUB_TO_USER_ID_KV 바인딩
+            { binding = "GOOGLE_SUB_TO_USER_ID_KV", id = "${CF_GOOGLE_SUB_TO_USER_ID_KV_NAMESPACE_ID}" }
           ]
           EOF
           echo "wrangler.toml created."
