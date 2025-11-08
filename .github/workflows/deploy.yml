@@ -44,8 +44,17 @@ jobs:
           ]
           EOF
           echo "wrangler.toml created."
+          echo "---- wrangler.toml ----"
+          sed -n '1,200p' wrangler.toml || true
 
-      - name: Publish to Cloudflare Workers
-        uses: actions/setup-node@v3
-        with:
-          token: ${{ secrets.CF_API_TOKEN }}
+      - name: Install wrangler CLI and publish
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          # install wrangler globally (Node 18)
+          npm install -g wrangler
+          wrangler --version
+
+          # publish (wrangler reads CF_API_TOKEN from env)
+          wrangler publish --account-id "${CF_ACCOUNT_ID}"
