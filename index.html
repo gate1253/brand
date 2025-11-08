@@ -5,58 +5,30 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>RES302</title>
 	<link rel="stylesheet" href="assets/style.css" />
-	<style>
-		html,body{height:100%;margin:0;padding:0;font-family:Inter, Roboto, Arial, sans-serif;background:#f5f7fb;color:#222}
-		.container{max-width:900px;margin:48px auto;padding:24px;background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(20,30,60,0.08)}
-		header{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
-		h1{margin:0;font-size:28px;color:#111}
-		.lead{margin:0;color:#666;font-size:14px}
-		.form-row{display:flex;gap:10px;align-items:center;margin-top:16px}
-		.form-row input[type="url"]{flex:1;padding:12px 14px;border:1px solid #e6eaf0;border-radius:8px;font-size:14px}
-		.form-row button{padding:12px 18px;border:none;background:#1a73e8;color:#fff;border-radius:8px;cursor:pointer;font-weight:600}
-		.note{margin-top:8px;color:#555;font-size:13px;background:#f7f9fc;border:1px solid #eef3fb;padding:8px 10px;border-radius:6px;display:block}
-		.status{margin-top:10px;color:#444;font-size:13px}
-		.list{margin-top:22px}
-		.card{padding:12px;border-radius:8px;border:1px solid #eef2f7;background:#fff;display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
-		.card a.short{color:#1a73e8;font-weight:600;text-decoration:none}
-		.card .meta{color:#666;font-size:13px}
-		@media(max-width:560px){
-			.form-row{flex-direction:column;align-items:stretch}
-			.form-row button{width:100%}
-		}
-		.header-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
-		.header-actions a.support-link{font-size:13px;color:#1a73e8;text-decoration:none;padding:6px 10px;border-radius:8px;border:1px solid transparent}
-		.header-actions a.support-link:hover{background:#f1f7ff;border-color:#e6f0ff}
-	</style>
 </head>
 <body>
+	<!-- 추가: 우측 상단 고정 Support 링크 -->
+	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
+
 	<main class="container" role="main">
-		<header style="display:flex;align-items:center;gap:12px">
-			<div>
-				<h1>RES302</h1>
-				<p class="lead">간단하고 빠른 단축 URL 생성 서비스</p>
-			</div>
-			<!-- 변경: Support 링크 추가 -->
-			<div class="header-actions" aria-hidden="false">
-				<a class="support-link" href="/support/" title="지원 페이지 열기">Support</a>
-			</div>
-		</header>
+		<!-- 중앙 정렬된 로고 + 간단 설명 -->
+		<div class="brand" role="banner">
+			<img class="logo" src="assets/images/logo.png" alt="RES302">
+			<p class="lead" style="margin-top:0">간단하고 빠른 단축 URL 생성 서비스</p>
+		</div>
 
-		<section aria-labelledby="shorten-heading">
+		<!-- 중앙 검색(단축) 박스 -->
+		<section class="search-wrap" aria-labelledby="shorten-heading">
 			<h2 id="shorten-heading" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">단축 URL 생성</h2>
-
-			<div class="form-row">
+			<form class="search-box" onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
 				<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com/long/path)" aria-label="원본 URL" />
-				<button id="shorten-btn">단축 생성</button>
-			</div>
-
-			<!-- note는 입력 필드 바로 아래에 위치해야 합니다 -->
-			<p class="note">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀 코드가 필요하면 회원으로 로그인하세요.</p>
-
-			<div id="msg" class="status" role="status" aria-live="polite"></div>
+				<button id="shorten-btn" type="button">단축 생성</button>
+			</form>
+			<p class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀 코드가 필요하면 회원으로 로그인하세요.</p>
+			<div id="msg" class="status" role="status" aria-live="polite" style="text-align:center"></div>
 		</section>
 	</main>
 
 	<script src="assets/app.js" defer></script>
-</body>
-</html>
+ </body>
+ </html>
