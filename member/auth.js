@@ -105,4 +105,11 @@
     }catch(e){ return null; }
   };
 
+  // 추가: 로그아웃 기능
+  window.logout = function() {
+    localStorage.removeItem('res302_tokens');
+    localStorage.removeItem('res302_pkce'); // 혹시 모를 잔여 데이터 정리
+    location.reload(); // UI를 업데이트하기 위해 페이지 새로고침
+  };
+
 })();

@@ -151,24 +151,15 @@ body{
 	outline:none;
 	box-shadow:0 4px 12px rgba(26,115,232,0.12);
 }
-@media (max-width:560px){
-	.top-right-support{
-		top:10px;
-		right:10px;
-		padding:6px 8px;
-		font-size:12px;
-	}
-}
 
-/* 로그인 버튼: Support 버튼과 동일 스타일, 오른쪽에 나란히 배치 */
-.top-right-login{
+/* 변경: 로그인/로그아웃 버튼 공통 스타일 */
+.auth-button {
 	position:fixed;
 	top:16px;
-	right:110px; /* Support(16px)보다 왼쪽에 위치하도록 설정 */
+	right:110px; /* Support 버튼 옆에 위치 */
 	z-index:1000;
 	display:inline-flex;
 	align-items:center;
-	gap:8px;
 	padding:8px 12px;
 	border-radius:999px;
 	background:rgba(26,115,232,0.06);
@@ -178,25 +169,27 @@ body{
 	font-weight:600;
 	font-size:13px;
 	box-shadow:0 2px 6px rgba(0,0,0,0.06);
+    font-family: Inter, Roboto, Arial, sans-serif; /* 버튼에 폰트 적용 */
+    cursor: pointer;
 }
-.top-right-login:hover,
-.top-right-login:focus{
+.auth-button:hover,
+.auth-button:focus{
 	background:rgba(26,115,232,0.12);
 	outline:none;
 	box-shadow:0 4px 12px rgba(26,115,232,0.12);
 }
 
-/* 모바일에서 두 버튼이 겹치지 않도록 재배치 */
 @media (max-width:560px){
-	.top-right-login{
-		top:10px;
-		right:72px; /* 모바일에서는 간격 축소 */
-		padding:6px 8px;
-		font-size:12px;
-	}
 	.top-right-support{
 		top:10px;
 		right:10px;
+		padding:6px 8px;
+		font-size:12px;
+	}
+	/* 추가: 모바일에서 로그인/로그아웃 버튼 위치 조정 */
+	.auth-button {
+		top:10px;
+		right:72px;
 		padding:6px 8px;
 		font-size:12px;
 	}
