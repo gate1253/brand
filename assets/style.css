@@ -258,6 +258,20 @@ body{
     margin-bottom: 20px;
 }
 
+/* 추가: 모달 내 섹션 간격 */
+.api-key-section,
+.user-id-section {
+    margin-bottom: 20px;
+}
+.api-key-section h3,
+.user-id-section h3 {
+    font-size: 16px;
+    color: #333;
+    margin-top: 0;
+    margin-bottom: 8px;
+    text-align: left;
+}
+
 /* 추가: 모달 닫기 버튼 */
 .modal-close-btn {
     position: absolute;
@@ -288,7 +302,8 @@ body{
     margin-bottom: 15px;
     word-break: break-all;
 }
-#display-api-key {
+#display-api-key,
+#display-unique-user-id { /* 추가: 고유 사용자 ID 표시 코드 스타일 */
     flex-grow: 1;
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
     font-size: 14px;

@@ -42,12 +42,25 @@
 	<div id="api-key-modal" class="modal-overlay hidden">
 		<div class="modal-content">
 			<button class="modal-close-btn" id="modal-close-btn">&times;</button>
-			<h2>내 API 키</h2>
-			<p>아래 API 키를 사용하여 커스텀 단축 URL을 생성할 수 있습니다.</p>
-			<div class="api-key-display">
-				<code id="display-api-key"></code>
-				<button id="copy-api-key-btn" class="btn primary small">복사</button>
+			<h2>내 계정 정보</h2>
+			<p>아래 정보를 사용하여 API를 호출하거나 계정을 식별할 수 있습니다.</p>
+
+			<div class="api-key-section">
+				<h3>API 키</h3>
+				<div class="api-key-display">
+					<code id="display-api-key"></code>
+					<button id="copy-api-key-btn" class="btn primary small">복사</button>
+				</div>
 			</div>
+
+			<div class="user-id-section">
+				<h3>고유 사용자 ID</h3>
+				<div class="api-key-display">
+					<code id="display-unique-user-id"></code>
+					<button id="copy-user-id-btn" class="btn primary small">복사</button>
+				</div>
+			</div>
+			
 			<p class="modal-message" id="modal-message"></p>
 		</div>
 	</div>
@@ -77,9 +90,11 @@
 					profilePicture.addEventListener('click', () => {
 						const apiKeyModal = document.getElementById('api-key-modal');
 						const displayApiKey = document.getElementById('display-api-key');
+						const displayUniqueUserId = document.getElementById('display-unique-user-id'); // 추가
 						const modalMessage = document.getElementById('modal-message');
 						
 						displayApiKey.textContent = user.apiKey;
+						displayUniqueUserId.textContent = user.uniqueUserId; // 추가
 						modalMessage.textContent = ''; // 이전 메시지 초기화
 						apiKeyModal.classList.remove('hidden');
 					});
@@ -104,6 +119,19 @@
 				} catch (err) {
 					modalMessage.textContent = 'API 키 복사 실패.';
 					console.error('Failed to copy API key:', err);
+				}
+			});
+
+			// 고유 사용자 ID 복사 버튼 이벤트 추가
+			document.getElementById('copy-user-id-btn').addEventListener('click', async () => {
+				const uniqueUserId = document.getElementById('display-unique-user-id').textContent;
+				const modalMessage = document.getElementById('modal-message');
+				try {
+					await navigator.clipboard.writeText(uniqueUserId);
+					modalMessage.textContent = '고유 사용자 ID가 클립보드에 복사되었습니다.';
+				} catch (err) {
+					modalMessage.textContent = '고유 사용자 ID 복사 실패.';
+					console.error('Failed to copy Unique User ID:', err);
 				}
 			});
 		});
