@@ -279,7 +279,8 @@ async function handleAuthCallback(request, env) {
 		await env.API_KEY_TO_SUB_KV.put(apiKey, uniqueUserId);
 
 		// 클라이언트에 토큰, 프로필 정보 (uniqueUserId 포함), API 키 반환
-		return jsonResponse({ tokens, profile: { ...profile, uniqueUserId }, apiKey }, 200);
+		// 변경: uniqueUserId를 profile 객체 안에 중첩시키는 대신, 최상위 속성으로 직접 반환
+		return jsonResponse({ tokens, profile: { ...profile, uniqueUserId }, apiKey, uniqueUserId }, 200);
 
 	} catch (e) {
 		// 변경: 오류 로깅 강화
