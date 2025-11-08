@@ -38,6 +38,20 @@
 		</section>
 	</main>
 
+	<!-- 추가: API 키 모달 -->
+	<div id="api-key-modal" class="modal-overlay hidden">
+		<div class="modal-content">
+			<button class="modal-close-btn" id="modal-close-btn">&times;</button>
+			<h2>내 API 키</h2>
+			<p>아래 API 키를 사용하여 커스텀 단축 URL을 생성할 수 있습니다.</p>
+			<div class="api-key-display">
+				<code id="display-api-key"></code>
+				<button id="copy-api-key-btn" class="btn primary small">복사</button>
+			</div>
+			<p class="modal-message" id="modal-message"></p>
+		</div>
+	</div>
+
 	<script src="/member/auth.js" defer></script>
 	<script src="assets/app.js" defer></script>
 	<script>
@@ -50,16 +64,48 @@
 				// 로그인된 경우: 프로필 사진과 로그아웃 버튼 표시
 				const userName = user.name || 'User profile';
 				authContainer.innerHTML = `
-					${user.picture ? `<img src="${user.picture}" alt="${userName}" class="profile-picture">` : ''}
+					${user.picture ? `<img src="${user.picture}" alt="${userName}" class="profile-picture clickable" id="profile-picture">` : ''}
 					<button id="logout-btn" class="auth-button" type="button">Logout</button>
 				`;
 				document.getElementById('logout-btn').addEventListener('click', () => {
 					window.logout();
 				});
+
+				// 프로필 사진 클릭 시 API 키 모달 열기
+				const profilePicture = document.getElementById('profile-picture');
+				if (profilePicture) {
+					profilePicture.addEventListener('click', () => {
+						const apiKeyModal = document.getElementById('api-key-modal');
+						const displayApiKey = document.getElementById('display-api-key');
+						const modalMessage = document.getElementById('modal-message');
+						
+						displayApiKey.textContent = user.apiKey;
+						modalMessage.textContent = ''; // 이전 메시지 초기화
+						apiKeyModal.classList.remove('hidden');
+					});
+				}
 			} else {
 				// 로그아웃된 경우: 로그인 버튼 표시
 				authContainer.innerHTML = `<a class="auth-button" href="/member/login.html">Login</a>`;
 			}
+
+			// 모달 닫기 버튼 이벤트
+			document.getElementById('modal-close-btn').addEventListener('click', () => {
+				document.getElementById('api-key-modal').classList.add('hidden');
+			});
+
+			// API 키 복사 버튼 이벤트
+			document.getElementById('copy-api-key-btn').addEventListener('click', async () => {
+				const apiKey = document.getElementById('display-api-key').textContent;
+				const modalMessage = document.getElementById('modal-message');
+				try {
+					await navigator.clipboard.writeText(apiKey);
+					modalMessage.textContent = 'API 키가 클립보드에 복사되었습니다.';
+				} catch (err) {
+					modalMessage.textContent = 'API 키 복사 실패.';
+					console.error('Failed to copy API key:', err);
+				}
+			});
 		});
 	</script>
  </body>
