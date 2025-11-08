@@ -1,6 +1,7 @@
 const urlInput = document.getElementById('url-input');
 const shortenBtn = document.getElementById('shorten-btn');
 const msg = document.getElementById('msg');
+const API_BASE = 'https://res302.gate1253.workers.dev';
 
 shortenBtn.addEventListener('click', async () => {
 	const url = urlInput.value.trim();
@@ -8,7 +9,7 @@ shortenBtn.addEventListener('click', async () => {
 	if(!url){ msg.textContent = 'URL을 입력하세요.'; return; }
 	msg.textContent = '요청 중...';
 	try{
-		const res = await fetch('/api/shorten', {
+		const res = await fetch(`${API_BASE}/api/shorten`, {
 			method: 'POST',
 			headers: {'Content-Type':'application/json'},
 			body: JSON.stringify({url})
