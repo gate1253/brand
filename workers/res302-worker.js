@@ -312,17 +312,24 @@ export async function handleRequest(request, env){
 	}
 	// 리다이렉트: GET /{code} 또는 /{uniqueUserId}/{code}
 	if(request.method === 'GET' && pathname.length > 1){
-		const pathSegments = pathname.slice(1).split('/');
+		const fullPath = pathname.slice(1); // 예: "user123abcde/my/custom/code" 또는 "abc123"
+		const pathSegments = fullPath.split('/');
 		let targetCode = null; // KV에서 조회할 최종 키
 
-		if (pathSegments.length === 2) { // /{uniqueUserId}/{code} 패턴
-			const uniqueUserId = pathSegments[0];
-			const aliasCode = pathSegments[1];
-			// handleShorten에서 ${uniqueUserId}/${code}로 저장했으므로 그대로 사용
-			targetCode = `${uniqueUserId}/${aliasCode}`;
-		} else if (pathSegments.length === 1) { // /{code} 패턴
-			targetCode = pathSegments[0];
+		// 첫 번째 세그먼트가 uniqueUserId (12자리 영숫자)처럼 보이는지 확인하는 휴리스틱
+		// makeUniqueId 함수가 12자리 base36 문자열을 생성하므로 이를 활용
+		const isFirstSegmentUniqueUserId = pathSegments.length >= 2 && pathSegments[0].length === 12 && /^[a-z0-9]+$/i.test(pathSegments[0]);
+
+		if (isFirstSegmentUniqueUserId) {
+			// /{uniqueUserId}/{alias_with_slashes} 패턴으로 간주
+			// KV 키는 전체 경로 (예: "user123abcde/my/custom/code")
+			targetCode = fullPath;
+		} else if (pathSegments.length === 1) {
+			// /{code} 패턴 (무작위 코드)으로 간주
+			targetCode = fullPath;
 		}
+		// 그 외의 경우 (예: pathSegments.length > 1 이지만 첫 세그먼트가 uniqueUserId가 아닌 경우)
+		// 유효하지 않은 경로로 간주하여 404로 처리됩니다.
 
 		if (targetCode) {
 			const target = await env.RES302_KV.get(targetCode);
