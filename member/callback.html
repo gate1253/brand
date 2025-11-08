@@ -27,18 +27,9 @@
         status.textContent = '인증 코드 교환 중...';
         const profile = await window.handleCallback(); // returns profile object
         if(profile){
-          document.getElementById('profile').style.display = 'block';
-          document.getElementById('profile').innerHTML = `
-            <p><strong>${profile.name || ''}</strong> (${profile.email || ''})</p>
-            <p><img src="${profile.picture || ''}" alt="profile" style="width:96px;border-radius:50%"></p>
-            <p><button id="signout" class="btn">로그아웃</button></p>
-          `;
-          document.getElementById('status').textContent = '인증이 완료되었습니다.';
-          document.getElementById('signout').addEventListener('click', () => {
-            localStorage.removeItem('res302_tokens');
-            localStorage.removeItem('res302_pkce');
-            location.href = '/';
-          });
+          // 변경: 인증 완료 후 index.html로 바로 리디렉션
+          status.textContent = '인증이 완료되었습니다. 홈으로 이동합니다.';
+          location.href = '/';
         }else{
           status.textContent = '인증에 실패했습니다.';
         }
