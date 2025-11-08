@@ -1,0 +1,42 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set Git user (optional)
+        run: |
+          git config --global user.name "${{ secrets.GIT_USER_NAME || 'github-actions[bot]' }}"
+          git config --global user.email "${{ secrets.GIT_USER_EMAIL || 'github-actions[bot]@users.noreply.github.com' }}"
+
+      - name: Create wrangler.toml from secrets
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+        run: |
+          cat > wrangler.toml <<'EOF'
+          name = "res302"
+          main = "workers/res302-worker.js"
+          type = "module"
+          compatibility_date = "2025-11-08"
+          account_id = "${CF_ACCOUNT_ID}"
+          kv_namespaces = [
+            { binding = "RES302_KV", id = "${CF_KV_NAMESPACE_ID}" }
+          ]
+          EOF
+          echo "wrangler.toml created."
+
+      - name: Publish to Cloudflare Workers
+        uses: cloudflare/wrangler-action@2.0.0
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          workingDirectory: .
+          args: publish --account-id ${{ secrets.CF_ACCOUNT_ID }}

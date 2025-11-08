@@ -1,0 +1,14 @@
+name = "res302"
+# main 경로는 이 wrangler.toml 파일을 기준으로 해석됩니다.
+# workers 폴더에 res302-worker.js가 있으면 아래처럼 './workers/...'로 명시적으로 적어 주세요.
+main = "./workers/res302-worker.js"
+type = "module"
+compatibility_date = "2025-11-08"
+# account_id 와 KV namespace id 는 CI에서 wrangler.toml을 생성할 때 주입됩니다.
+# 로컬에서 테스트하려면 아래 값을 실제 ID로 교체하세요.
+account_id = "your_account_id_here"
+
+# KV 네임스페이스 바인딩 (로컬 테스트 시 id 교체)
+kv_namespaces = [
+  { binding = "RES302_KV", id = "your_kv_namespace_id_here" }
+]

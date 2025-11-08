@@ -48,28 +48,30 @@ async function handleList(env){
 	return new Response(JSON.stringify(list), {status:200, headers:{'Content-Type':'application/json'}});
 }
 
-export default {
-	async fetch(request, env) {
-		const url = new URL(request.url);
-		const pathname = url.pathname;
-		// API: POST /api/shorten
-		if(request.method === 'POST' && pathname === '/api/shorten'){
-			return handleShorten(request, env);
+export async function handleRequest(request, env){
+	const url = new URL(request.url);
+	const pathname = url.pathname;
+	// API: POST /api/shorten
+	if(request.method === 'POST' && pathname === '/api/shorten'){
+		return handleShorten(request, env);
+	}
+	// API: GET /api/list
+	if(request.method === 'GET' && pathname === '/api/list'){
+		return handleList(env);
+	}
+	// 리다이렉트: GET /{code}
+	if(request.method === 'GET' && pathname.length > 1){
+		const code = pathname.slice(1).split('/')[0];
+		const target = await env.RES302_KV.get(code);
+		if(target){
+			return Response.redirect(target, 302);
 		}
-		// API: GET /api/list
-		if(request.method === 'GET' && pathname === '/api/list'){
-			return handleList(env);
-		}
-		// 리다이렉트: GET /{code}
-		if(request.method === 'GET' && pathname.length > 1){
-			const code = pathname.slice(1).split('/')[0];
-			const target = await env.RES302_KV.get(code);
-			if(target){
-				return Response.redirect(target, 302);
-			}
-			return new Response('Not found', {status:404});
-		}
-		// 기타
 		return new Response('Not found', {status:404});
 	}
+	// 기타
+	return new Response('Not found', {status:404});
+}
+
+export default {
+	fetch: handleRequest
 };
