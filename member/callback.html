@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>인증 중… · RES302</title>
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  .wrap{max-width:760px;margin:40px auto;padding:20px;background:#fff;border-radius:10px;text-align:center}
+  .btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer}
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>인증 처리 중입니다…</h1>
+    <p id="status">잠시만 기다려 주세요.</p>
+    <div id="profile" style="display:none;margin-top:18px"></div>
+    <p style="margin-top:18px"><a href="/" class="btn">홈으로</a></p>
+  </main>
+
+  <script src="/member/auth.js" defer></script>
+  <script>
+    // callback 처리: auth.js에서 export한 handleCallback을 호출
+    (async () => {
+      const status = document.getElementById('status');
+      try{
+        status.textContent = '인증 코드 교환 중...';
+        const profile = await window.handleCallback(); // returns profile object
+        if(profile){
+          document.getElementById('profile').style.display = 'block';
+          document.getElementById('profile').innerHTML = `
+            <p><strong>${profile.name || ''}</strong> (${profile.email || ''})</p>
+            <p><img src="${profile.picture || ''}" alt="profile" style="width:96px;border-radius:50%"></p>
+            <p><button id="signout" class="btn">로그아웃</button></p>
+          `;
+          document.getElementById('status').textContent = '인증이 완료되었습니다.';
+          document.getElementById('signout').addEventListener('click', () => {
+            localStorage.removeItem('res302_tokens');
+            localStorage.removeItem('res302_pkce');
+            location.href = '/';
+          });
+        }else{
+          status.textContent = '인증에 실패했습니다.';
+        }
+      }catch(err){
+        console.error(err);
+        status.textContent = '인증 처리 중 오류가 발생했습니다.';
+      }
+    })();
+  </script>
+</body>
+</html>
