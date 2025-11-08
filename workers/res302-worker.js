@@ -85,7 +85,15 @@ async function handleShorten(req, env){
             // 변경: API 키로 검증된 사용자의 uniqueUserId를 직접 사용
             const uniqueUserIdFromApiKey = user.uniqueUserId;
 
-            code = alias.trim(); // alias를 실제 코드로 사용
+            code = alias.trim();
+            // 추가: 커스텀 코드(alias)에 선행 '/'가 있으면 제거
+            if (code.startsWith('/')) {
+                code = code.substring(1);
+            }
+            if (!code) { // '/'만 있었거나 trim 후 비어있는 경우
+                return jsonResponse({error: '유효하지 않은 커스텀 코드입니다.'}, 400);
+            }
+
             fullRedirectPath = `${uniqueUserIdFromApiKey}/${code}`; // 리다이렉트 경로에 검증된 uniqueUserId 사용
             
             // KV에서 사용자별 alias 존재 여부 확인
