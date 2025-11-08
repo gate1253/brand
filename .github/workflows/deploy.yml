@@ -38,9 +38,9 @@ jobs:
           main = "workers/res302-worker.js"
           type = "module"
           compatibility_date = "2025-11-08"
-          account_id = "${CF_ACCOUNT_ID}"
+          account_id = "${{ secrets.CF_ACCOUNT_ID }}"
           kv_namespaces = [
-            { binding = "RES302_KV", id = "${CF_KV_NAMESPACE_ID}" }
+            { binding = "RES302_KV", id = "${{ secrets.CF_KV_NAMESPACE_ID }}" }
           ]
           EOF
           echo "wrangler.toml created."
