@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RES302 · Support / API 사용 예제</title>
+  <link rel="stylesheet" href="/assets/style.css" />
+  <style>
+    body{font-family:Inter, Roboto, Arial, sans-serif;background:#f5f7fb;color:#222;margin:0;padding:24px}
+    .wrap{max-width:900px;margin:24px auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(20,30,60,0.06)}
+    pre{background:#f7f9fc;padding:12px;border-radius:6px;overflow:auto}
+    .demo{margin-top:12px;display:flex;gap:8px;align-items:center}
+    .demo input{flex:1;padding:8px;border:1px solid #e6eaf0;border-radius:6px}
+    .demo button{padding:8px 12px;border:none;background:#1a73e8;color:#fff;border-radius:6px;cursor:pointer}
+    .result{margin-top:12px;font-size:14px;color:#111}
+    a.back{display:inline-block;margin-bottom:12px;color:#1a73e8;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <a class="back" href="/" aria-label="홈으로 돌아가기">← 홈으로 돌아가기</a>
+    <h1>API 사용 예제</h1>
+    <p>단축 URL 생성 API 엔드포인트: <code>https://res302.gate1253.workers.dev/api/shorten</code></p>
+
+    <h2>1) curl 예제</h2>
+    <pre><code>curl -X POST "https://res302.gate1253.workers.dev/api/shorten" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/long/path"}'
+</code></pre>
+    <p>응답 예시:</p>
+    <pre><code>{
+  "ok": true,
+  "code": "a1B2c3",
+  "shortUrl": "https://res302.gate1253.workers.dev/a1B2c3"
+}
+</code></pre>
+
+    <h2>2) JavaScript (fetch) 예제</h2>
+    <pre><code>const API_BASE = 'https://res302.gate1253.workers.dev';
+
+async function shorten(url, alias) {
+  const body = alias ? { url, alias } : { url };
+  const res = await fetch(`${API_BASE}/api/shorten`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// 사용 예:
+shorten('https://example.com/long/path')
+  .then(data => console.log(data))
+  .catch(err => console.error(err));
+</code></pre>
+    <p>참고: 브라우저에서 다른 오리진으로 호출할 경우 CORS preflight(OPTIONS)가 발생합니다. 서비스는 기본적으로 모든 오리진을 허용하도록 설정되어 있지만, 필요 시 도메인 제한을 적용하세요.</p>
+
+    <h2>3) 페이지 내 데모</h2>
+    <div class="demo" aria-live="polite">
+      <input id="demo-url" type="url" placeholder="https://example.com/long/path" />
+      <button id="demo-btn">단축 생성</button>
+    </div>
+    <div id="demo-result" class="result" role="status"></div>
+
+    <script>
+      (function(){
+        const API_BASE = 'https://res302.gate1253.workers.dev';
+        const btn = document.getElementById('demo-btn');
+        const input = document.getElementById('demo-url');
+        const out = document.getElementById('demo-result');
+
+        btn.addEventListener('click', async () => {
+          const url = input.value.trim();
+          if(!url){ out.textContent = 'URL을 입력하세요.'; return; }
+          out.textContent = '요청 중...';
+          try{
+            const res = await fetch(`${API_BASE}/api/shorten`, {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ url })
+            });
+            const data = await res.json();
+            if(!res.ok){
+              out.textContent = data.error || '생성 실패';
+              return;
+            }
+            out.innerHTML = '완료: <a href="' + data.shortUrl + '" target="_blank" rel="noopener noreferrer">' + data.shortUrl + '</a>';
+            input.value = '';
+          }catch(e){
+            out.textContent = '요청 중 오류';
+            console.error(e);
+          }
+        });
+      })();
+    </script>
+
+    <h3>추가 안내</h3>
+    <ul>
+      <li>비회원은 커스텀 alias 전송 시 서버에서 거절될 수 있습니다(권한 필요).</li>
+      <li>대량 요청 시 rate limit이 적용될 수 있습니다. 자동화 전 관리자에게 문의하세요.</li>
+    </ul>
+  </div>
+</body>
+</html>
