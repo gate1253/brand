@@ -35,14 +35,15 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
         run: |
-          cat > wrangler.toml <<'EOF'
+          # Use unquoted heredoc to allow shell variable expansion
+          cat > wrangler.toml <<EOF
           name = "res302"
           main = "workers/res302-worker.js"
           type = "module"
           compatibility_date = "2025-11-08"
-          account_id = "${{ secrets.CF_ACCOUNT_ID }}"
+          account_id = "${CF_ACCOUNT_ID}"
           kv_namespaces = [
-            { binding = "RES302_KV", id = "${{ secrets.CF_KV_NAMESPACE_ID }}" }
+            { binding = "RES302_KV", id = "${CF_KV_NAMESPACE_ID}" }
           ]
           EOF
           echo "wrangler.toml created."
@@ -53,10 +54,17 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          # Add Google secrets to the environment
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_SECRET: ${{ secrets.GOOGLE_SECRET }}
         run: |
           # install wrangler globally (Node 20)
           npm install -g wrangler
           wrangler --version
 
-          # deploy (wrangler reads CF_API_TOKEN from env)
+          # Set Google secrets for the worker. These are stored encrypted by Cloudflare.
+          echo "${GOOGLE_CLIENT_ID}" | wrangler secret put GOOGLE_CLIENT_ID
+          echo "${GOOGLE_SECRET}" | wrangler secret put GOOGLE_SECRET
+
+          # deploy (wrangler reads CLOUDFLARE_API_TOKEN from env)
           wrangler deploy
