@@ -62,6 +62,75 @@ async function handleList(env){
 	return jsonResponse(list, 200);
 }
 
+// 추가: Google OAuth 콜백을 처리하고 토큰을 교환하는 함수
+async function handleAuthCallback(request, env) {
+	try {
+		const { code, code_verifier, redirect_uri } = await request.json();
+		if (!code || !code_verifier || !redirect_uri) {
+			return jsonResponse({ error: '필수 파라미터가 누락되었습니다.' }, 400);
+		}
+
+		// 환경 변수에서 Google OAuth 클라이언트 정보 가져오기
+		const GOOGLE_CLIENT_ID = env.GOOGLE_CLIENT_ID;
+		const GOOGLE_SECRET = env.GOOGLE_SECRET;
+
+		if (!GOOGLE_CLIENT_ID || !GOOGLE_SECRET) {
+			return jsonResponse({ error: '서버에 OAuth 환경 변수가 설정되지 않았습니다.' }, 500);
+		}
+
+		const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+		const body = new URLSearchParams({
+			grant_type: 'authorization_code',
+			code: code,
+			client_id: GOOGLE_CLIENT_ID,
+			client_secret: GOOGLE_SECRET,
+			redirect_uri: redirect_uri,
+			code_verifier: code_verifier,
+		});
+
+		const res = await fetch(TOKEN_ENDPOINT, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: body.toString(),
+		});
+
+		if (!res.ok) {
+			const errorText = await res.text();
+			console.error('Google Token Exchange Error:', errorText);
+			return jsonResponse({ error: 'Google 인증 토큰 교환에 실패했습니다.', details: errorText }, 400);
+		}
+
+		const tokens = await res.json();
+		let profile = {};
+
+		// id_token에서 프로필 정보 디코딩
+		if (tokens.id_token) {
+			const idp = tokens.id_token.split('.');
+			if (idp[1]) {
+				try {
+					const payload = JSON.parse(atob(idp[1].replace(/-/g, '+').replace(/_/g, '/')));
+					profile = {
+						sub: payload.sub,
+						name: payload.name,
+						email: payload.email,
+						picture: payload.picture,
+					};
+				} catch (e) {
+					console.error('ID Token decoding failed:', e);
+				}
+			}
+		}
+
+		// 클라이언트에 토큰과 프로필 정보 반환
+		return jsonResponse({ tokens, profile }, 200);
+
+	} catch (e) {
+		console.error('Auth Callback Error:', e);
+		return jsonResponse({ error: '인증 처리 중 서버 오류가 발생했습니다.' }, 500);
+	}
+}
+
+
 export async function handleRequest(request, env){
 	// OPTIONS preflight 처리 추가
 	if(request.method === 'OPTIONS'){
@@ -70,6 +139,12 @@ export async function handleRequest(request, env){
 
 	const url = new URL(request.url);
 	const pathname = url.pathname;
+
+	// 추가: POST /api/member 라우트
+	if (request.method === 'POST' && pathname === '/api/member') {
+		return handleAuthCallback(request, env);
+	}
+
 	// API: POST /api/shorten
 	if(request.method === 'POST' && pathname === '/api/shorten'){
 		return handleShorten(request, env);

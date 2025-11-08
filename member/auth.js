@@ -2,7 +2,7 @@
 // IMPORTANT: replace CLIENT_ID with your Google OAuth Client ID
 (function(){
   // 구성: 반드시 실제 값으로 교체
-  const CLIENT_ID = '178229425055-dgojh3m0b58rbf1uu6qk30jtbj1ne8lh.apps.googleusercontent.com';
+  const CLIENT_ID = '178229425055-plib60kregok453r7rr3oti5aug7b14m.apps.googleusercontent.com';
   const REDIRECT_URI = (location.origin + '/member/callback.html');
   const SCOPE = 'openid email profile';
   const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -62,34 +62,33 @@
     const pkce = JSON.parse(localStorage.getItem('res302_pkce') || '{}');
     if(!pkce || !pkce.code_verifier) throw new Error('no_pkce');
 
-    // token exchange
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code: code,
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: pkce.code_verifier
+    // 변경: 코드를 Google에 직접 보내는 대신, 워커(백엔드)로 전송합니다.
+    // 워커가 안전하게 토큰 교환을 처리합니다.
+    const WORKER_AUTH_ENDPOINT = 'https://res302.gate1253.workers.dev/api/member';
+
+    const res = await fetch(WORKER_AUTH_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        code: code,
+        code_verifier: pkce.code_verifier,
+        redirect_uri: REDIRECT_URI // Google에 토큰 요청 시 필요하므로 워커에 전달
+      })
     });
 
-    const res = await fetch(TOKEN_ENDPOINT, {
-      method: 'POST',
-      headers: {'Content-Type':'application/x-www-form-urlencoded'},
-      body: body.toString()
-    });
     if(!res.ok) {
       const txt = await res.text();
-      throw new Error('token_exchange_failed: ' + txt);
+      throw new Error('worker_auth_failed: ' + txt);
     }
-    const tokens = await res.json(); // access_token, id_token, refresh_token (maybe)
-    // decode id_token payload (basic)
-    const idp = tokens.id_token && tokens.id_token.split('.');
-    let profile = {};
-    if(idp && idp[1]){
-      try{
-        const payload = JSON.parse(atob(idp[1].replace(/-/g,'+').replace(/_/g,'/')));
-        profile = payload;
-      }catch(e){}
+
+    // 워커는 { tokens, profile } 객체를 반환해야 합니다.
+    const data = await res.json();
+    const { tokens, profile } = data;
+
+    if (!tokens || !profile) {
+      throw new Error('worker_invalid_response: ' + JSON.stringify(data));
     }
+
     // persist tokens/profile (short-lived)
     localStorage.setItem('res302_tokens', JSON.stringify({tokens, profile, ts: Date.now()}));
     // cleanup pkce
