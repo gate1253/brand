@@ -46,10 +46,8 @@ jobs:
           echo "wrangler.toml created."
 
       - name: Publish to Cloudflare Workers
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         uses: actions/setup-node@v3
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
+          token: ${{ secrets.CF_API_TOKEN }}
           workingDirectory: .
           args: publish --account-id ${{ secrets.CF_ACCOUNT_ID }}
