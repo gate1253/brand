@@ -152,12 +152,29 @@ body{
 	box-shadow:0 4px 12px rgba(26,115,232,0.12);
 }
 
-/* 변경: 로그인/로그아웃 버튼 공통 스타일 */
+/* 추가: 로그인 위젯 컨테이너 (우측 상단 고정) */
+.auth-widget {
+    position: fixed;
+    top: 16px;
+    right: 90px; /* Support 버튼 옆에 위치하도록 조정 */
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 추가: 프로필 사진 스타일 */
+.profile-picture {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 변경: 로그인/로그아웃 버튼 공통 스타일 (위치 지정 제거) */
 .auth-button {
-	position:fixed;
-	top:16px;
-	right:110px; /* Support 버튼 옆에 위치 */
-	z-index:1000;
+	/* position:fixed; 속성 제거 */
 	display:inline-flex;
 	align-items:center;
 	padding:8px 12px;
@@ -186,10 +203,16 @@ body{
 		padding:6px 8px;
 		font-size:12px;
 	}
-	/* 추가: 모바일에서 로그인/로그아웃 버튼 위치 조정 */
+	/* 추가: 모바일에서 로그인 위젯 위치 및 크기 조정 */
+	.auth-widget {
+		top: 10px;
+		right: 70px;
+	}
+    .profile-picture {
+        width: 28px;
+        height: 28px;
+    }
 	.auth-button {
-		top:10px;
-		right:72px;
 		padding:6px 8px;
 		font-size:12px;
 	}

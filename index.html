@@ -9,8 +9,8 @@
 <body>
 	<!-- 추가: 우측 상단 고정 Support 링크 -->
 	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
-	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너 -->
-	<div id="auth-container"></div>
+	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
+	<div id="auth-container" class="auth-widget"></div>
 
 	<main class="container" role="main">
 		<!-- 중앙 정렬된 로고 + 간단 설명 -->
@@ -40,8 +40,12 @@
 			const user = window.getCurrentUser();
 
 			if (user) {
-				// 로그인된 경우: 로그아웃 버튼 표시
-				authContainer.innerHTML = `<button id="logout-btn" class="auth-button" type="button">Logout</button>`;
+				// 로그인된 경우: 프로필 사진과 로그아웃 버튼 표시
+				const userName = user.name || 'User profile';
+				authContainer.innerHTML = `
+					${user.picture ? `<img src="${user.picture}" alt="${userName}" class="profile-picture">` : ''}
+					<button id="logout-btn" class="auth-button" type="button">Logout</button>
+				`;
 				document.getElementById('logout-btn').addEventListener('click', () => {
 					window.logout();
 				});
