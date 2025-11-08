@@ -22,9 +22,9 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
         run: |
-          cat > wrangler.toml <<'EOF'
+          cat > brand/wrangler.toml <<'EOF'
           name = "res302"
-          main = "workers/res302-worker.js"
+          main = "./workers/res302-worker.js"
           type = "module"
           compatibility_date = "2025-11-08"
           account_id = "${CF_ACCOUNT_ID}"
@@ -32,11 +32,18 @@ jobs:
             { binding = "RES302_KV", id = "${CF_KV_NAMESPACE_ID}" }
           ]
           EOF
-          echo "wrangler.toml created."
+          echo "wrangler.toml created in ./brand."
+
+      - name: Debug: list brand dir and show wrangler.toml
+        run: |
+          ls -la brand || true
+          echo "---- brand/wrangler.toml ----"
+          sed -n '1,200p' brand/wrangler.toml || true
 
       - name: Publish to Cloudflare Workers
         uses: cloudflare/wrangler-action@2.0.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
-          workingDirectory: .
-          args: publish --account-id ${{ secrets.CF_ACCOUNT_ID }}
+          workingDirectory: ./brand
+          command: publish
+          args: --account-id ${{ secrets.CF_ACCOUNT_ID }}
