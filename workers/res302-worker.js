@@ -324,11 +324,12 @@ export async function handleRequest(request, env){
 		const pathSegments = fullPath.split('/');
 		let targetCode = null; // KV에서 조회할 최종 키
 
-		// 첫 번째 세그먼트가 uniqueUserId (12자리 영숫자)처럼 보이는지 확인하는 휴리스틱
-		// makeUniqueId 함수가 12자리 base36 문자열을 생성하므로 이를 활용
-		const isFirstSegmentUniqueUserId = pathSegments.length >= 2 && pathSegments[0].length === 12 && /^[a-z0-9]+$/i.test(pathSegments[0]);
+		// 변경: 첫 번째 세그먼트가 uniqueUserId (영숫자)처럼 보이는지 확인하는 휴리스틱
+		// makeUniqueId 함수는 12자리 ID를 생성하지만, 기존 ID나 수동 입력 ID를 위해 길이에 대한 엄격한 검사를 완화합니다.
+		// 대신, 첫 번째 세그먼트가 영숫자로만 구성되어 있고, 경로 세그먼트가 2개 이상인 경우를 uniqueUserId 패턴으로 간주합니다.
+		const isFirstSegmentPotentiallyUniqueUserId = pathSegments.length >= 2 && /^[a-z0-9]+$/i.test(pathSegments[0]);
 
-		if (isFirstSegmentUniqueUserId) {
+		if (isFirstSegmentPotentiallyUniqueUserId) {
 			// /{uniqueUserId}/{alias_with_slashes} 패턴으로 간주
 			// KV 키는 전체 경로 (예: "user123abcde/my/custom/code")
 			targetCode = fullPath;
@@ -336,7 +337,7 @@ export async function handleRequest(request, env){
 			// /{code} 패턴 (무작위 코드)으로 간주
 			targetCode = fullPath;
 		}
-		// 그 외의 경우 (예: pathSegments.length > 1 이지만 첫 세그먼트가 uniqueUserId가 아닌 경우)
+		// 그 외의 경우 (예: pathSegments.length > 1 이지만 첫 세그먼트가 uniqueUserId 패턴이 아닌 경우)
 		// 유효하지 않은 경로로 간주하여 404로 처리됩니다.
 
 		if (targetCode) {
