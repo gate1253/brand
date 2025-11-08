@@ -2,7 +2,7 @@
 // IMPORTANT: replace CLIENT_ID with your Google OAuth Client ID
 (function(){
   // 구성: 반드시 실제 값으로 교체
-  const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE';
+  const CLIENT_ID = '178229425055-tc4b6f766ukm17jdd6blt9t5oa13gcea.apps.googleusercontent.com';
   const REDIRECT_URI = (location.origin + '/member/callback.html');
   const SCOPE = 'openid email profile';
   const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
