@@ -15,7 +15,7 @@ jobs:
       - name: Setup Node.js (use Node 18 to satisfy wrangler engine)
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Show Node / npm versions (debug)
@@ -52,7 +52,7 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
         run: |
-          # install wrangler globally (Node 18)
+          # install wrangler globally (Node 20)
           npm install -g wrangler
           wrangler --version
 
