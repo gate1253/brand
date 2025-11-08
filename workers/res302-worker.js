@@ -282,8 +282,9 @@ async function handleAuthCallback(request, env) {
 		return jsonResponse({ tokens, profile: { ...profile, uniqueUserId }, apiKey }, 200);
 
 	} catch (e) {
-		console.error('Auth Callback Error:', e);
-		return jsonResponse({ error: '인증 처리 중 서버 오류가 발생했습니다.' }, 500);
+		// 변경: 오류 로깅 강화
+		console.error('Auth Callback Error:', e.message, e.stack, e);
+		return jsonResponse({ error: '인증 처리 중 서버 오류가 발생했습니다.' + e.message }, 500);
 	}
 }
 
