@@ -1,5 +1,5 @@
 const CODE_KEY = 'RES302_codes_list_v1'; // KV에 저장되는 메타 리스트 키
-//API
+//API 
 function makeCode(len=6){
 	const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 	let s='';
