@@ -3,6 +3,9 @@ const API_BASE = 'https://res302.gate1253.workers.dev';
 const msg = document.getElementById('msg');
 // 검색 폼 컨테이너
 const searchBox = document.querySelector('.search-box');
+// 추가: 커스텀 코드 입력 필드 컨테이너 및 안내 메시지
+const aliasInputContainer = document.getElementById('alias-input-container');
+const customCodeNote = document.getElementById('custom-code-note');
 
 // 렌더: 입력 폼 (input + 단축 버튼)
 function renderForm() {
@@ -13,10 +16,24 @@ function renderForm() {
 	msg.textContent = '';
 	document.getElementById('shorten-btn').addEventListener('click', handleShorten);
 	document.getElementById('url-input').focus();
+
+	// 추가: 로그인 상태에 따라 커스텀 코드 입력 필드와 안내 메시지 표시/숨김
+	const user = window.getCurrentUser();
+	if (user) {
+		aliasInputContainer.classList.remove('hidden');
+		customCodeNote.classList.add('hidden'); // 로그인 시 안내 메시지 숨김
+	} else {
+		aliasInputContainer.classList.add('hidden');
+		customCodeNote.classList.remove('hidden'); // 로그아웃 시 안내 메시지 표시
+	}
 }
 
 // 렌더: 결과 (링크는 왼쪽, 버튼들은 오른쪽에 동일한 위치/스타일)
 function renderResult(shortUrl){
+	// 추가: 결과 표시 시 커스텀 코드 입력 필드와 안내 메시지 숨김
+	aliasInputContainer.classList.add('hidden');
+	customCodeNote.classList.add('hidden');
+
 	searchBox.innerHTML = `
 		<div class="result-left" style="flex:1;min-width:0">
 			<a href="${shortUrl}" target="_blank" rel="noopener noreferrer" id="result-link" style="font-weight:600;color:#1a73e8;word-break:break-all;">${shortUrl}</a>
@@ -47,11 +64,28 @@ async function handleShorten(){
 	const url = urlInput.value.trim();
 	if(!url){ msg.textContent = 'URL을 입력하세요.'; return; }
 	msg.textContent = '요청 중...';
+
+	// 추가: 로그인 상태이고 커스텀 코드 입력 필드가 있으면 alias 값 가져오기
+	let alias = null;
+	const user = window.getCurrentUser();
+	if (user) {
+		const aliasInput = document.getElementById('alias-input');
+		if (aliasInput) {
+			alias = aliasInput.value.trim();
+		}
+	}
+
+	// 추가: API 키를 Authorization 헤더에 포함
+	const headers = {'Content-Type':'application/json'};
+	if (user && user.apiKey) {
+		headers['Authorization'] = `Bearer ${user.apiKey}`;
+	}
+
 	try{
 		const res = await fetch(`${API_BASE}/api/shorten`, {
 			method: 'POST',
-			headers: {'Content-Type':'application/json'},
-			body: JSON.stringify({url})
+			headers: headers,
+			body: JSON.stringify({url, alias}) // alias를 API 요청 본문에 포함
 		});
 		const data = await res.json();
 		if(!res.ok){

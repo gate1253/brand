@@ -26,13 +26,20 @@
 				<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com/long/path)" aria-label="원본 URL" />
 				<button id="shorten-btn" type="button">단축 생성</button>
 			</form>
-			<p class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀 코드가 필요하면 회원으로 로그인하세요.</p>
+
+			<!-- 추가: 로그인 시 커스텀 코드 입력 필드 -->
+			<div id="alias-input-container" class="search-box alias-box hidden">
+				<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드" style="flex:1;border:none;outline:none;font-size:18px;padding:8px;background:transparent;">
+			</div>
+
+			<!-- 결과는 입력폼 영역이 대체하여 표시됩니다 (result-box 삭제) -->
+			<p id="custom-code-note" class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀 코드가 필요하면 회원으로 로그인하세요.</p>
 			<div id="msg" class="status" role="status" aria-live="polite" style="text-align:center"></div>
 		</section>
 	</main>
 
-	<script src="assets/app.js" defer></script>
 	<script src="/member/auth.js" defer></script>
+	<script src="assets/app.js" defer></script>
 	<script>
 		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
 		document.addEventListener('DOMContentLoaded', () => {

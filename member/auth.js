@@ -81,27 +81,29 @@
       throw new Error('worker_auth_failed: ' + txt);
     }
 
-    // 워커는 { tokens, profile } 객체를 반환해야 합니다.
+    // 워커는 { tokens, profile, apiKey } 객체를 반환해야 합니다.
     const data = await res.json();
-    const { tokens, profile } = data;
+    const { tokens, profile, apiKey } = data; // apiKey를 여기서 한 번만 구조 분해 할당
 
-    if (!tokens || !profile) {
+    // tokens, profile, apiKey 모두 존재하는지 확인
+    if (!tokens || !profile || !apiKey) {
       throw new Error('worker_invalid_response: ' + JSON.stringify(data));
     }
 
-    // persist tokens/profile (short-lived)
-    localStorage.setItem('res302_tokens', JSON.stringify({tokens, profile, ts: Date.now()}));
+    // persist tokens/profile/apiKey (short-lived)
+    localStorage.setItem('res302_tokens', JSON.stringify({tokens, profile, apiKey, ts: Date.now()}));
     // cleanup pkce
     localStorage.removeItem('res302_pkce');
     // optionally redirect to member area or return profile
-    return profile;
+    return profile; // 프로필만 반환해도 되지만, localStorage에는 apiKey가 저장됨
   };
 
   // helper to get current user
   window.getCurrentUser = function(){
     try{
       const s = JSON.parse(localStorage.getItem('res302_tokens') || '{}');
-      return s.profile || null;
+      // 변경: 프로필과 함께 apiKey도 반환
+      return s.profile ? { ...s.profile, apiKey: s.apiKey } : null;
     }catch(e){ return null; }
   };
 

@@ -4,11 +4,14 @@ name = "res302"
 main = "./workers/res302-worker.js"
 type = "module"
 compatibility_date = "2025-11-08"
-# account_id 와 KV namespace id 는 CI에서 wrangler.toml을 생성할 때 주입됩니다.
-# 로컬에서 테스트하려면 아래 값을 실제 ID로 교체하세요.
-account_id = "your_account_id_here"
-
-# KV 네임스페이스 바인딩 (로컬 테스트 시 id 교체)
+# NOTE:
+# - CI(Workflow)는 wrangler.toml을 런타임에 생성하여 민감한 값을 주입합니다.
+# - 로컬에서 테스트하려면 아래 account_id 및 kv_namespaces id를 실제 값으로 교체하세요.
+# account_id = "your_account_id_here"
 kv_namespaces = [
-  { binding = "RES302_KV", id = "your_kv_namespace_id_here" }
+  { binding = "RES302_KV", id = "your_res302_kv_namespace_id_here" },
+  # 추가: 사용자 데이터 저장을 위한 KV 네임스페이스
+  { binding = "USER_KV", id = "your_user_kv_namespace_id_here" },
+  # 추가: API 키 -> sub 매핑 저장을 위한 KV 네임스페이스
+  { binding = "API_KEY_TO_SUB_KV", id = "your_api_key_to_sub_kv_namespace_id_here" }
 ]
