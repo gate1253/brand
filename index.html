@@ -9,6 +9,10 @@
 <body>
 	<!-- 추가: 우측 상단 고정 Support 링크 -->
 	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
+	<!-- 추가: 우측 상단 Intro MP4 링크 -->
+	<a class="top-right-intro" href="/support/intro.mp4" target="_blank" rel="noopener noreferrer" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
+	<!-- 추가: 우측 상단 presentation.pdf 링크 -->
+	<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer" title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
 	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
 	<div id="auth-container" class="auth-widget"></div>
 
@@ -20,7 +24,7 @@
 		</div>
 
 		<!-- 중앙 검색(단축) 박스 -->
-		<section class="search-wrap" aria-labelledby="shorten-heading">
+		<section aria-labelledby="shorten-heading">
 			<h2 id="shorten-heading" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">단축 URL 생성</h2>
 			<form class="search-box" onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
 				<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com/long/path)" aria-label="원본 URL" />

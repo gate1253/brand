@@ -76,7 +76,7 @@ body{
 	flex:1;
 	border:none;
 	outline:none;
-	font-size:18px;
+	font-size:13px;
 	padding:8px;
 	background:transparent;
 }
@@ -143,37 +143,92 @@ body{
 	#shorten-btn{padding:8px 12px}
 }
 
+/* 상단 우측 고정 Presentation 링크 */
+.top-right-doc {
+    position: fixed;
+    top: 16px;
+    right: 16px; /* 가장 오른쪽에 위치 */
+    z-index: 1000;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background:#f8f9fa; /* 변경: 배경색 */
+    color:#5f6368; /* 변경: 글자색 */
+    border:1px solid #dadce0; /* 변경: 테두리색 */
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.08); /* 변경: 그림자 */
+}
+.top-right-doc:hover,
+.top-right-doc:focus {
+    background:#e8eaed; /* 변경: 호버/포커스 배경색 */
+    color:#202124; /* 추가: 호버/포커스 글자색 */
+    outline: none;
+    box-shadow:0 1px 3px rgba(0,0,0,0.12); /* 변경: 호버/포커스 그림자 */
+}
+
+/* 추가: 우측 상단 고정 Intro 링크 */
+.top-right-intro {
+    position: fixed;
+    top: 16px;
+    right: 135px; /* Presentation 링크 옆으로 이동 (약 16px 간격) */
+    z-index: 1000;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background:#f8f9fa; /* 변경: 배경색 */
+    color:#5f6368; /* 변경: 글자색 */
+    border:1px solid #dadce0; /* 변경: 테두리색 */
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.08); /* 변경: 그림자 */
+}
+.top-right-intro:hover,
+.top-right-intro:focus {
+    background:#e8eaed; /* 변경: 호버/포커스 배경색 */
+    color:#202124; /* 추가: 호버/포커스 글자색 */
+    outline: none;
+    box-shadow:0 1px 3px rgba(0,0,0,0.12); /* 변경: 호버/포커스 그림자 */
+}
+
 /* 상단 우측 고정 링크 요소 */
 .top-right-support{
 	position:fixed;
 	top:16px;
-	right:16px;
+	right:208px; /* Intro 링크 옆으로 이동 (약 16px 간격) */
 	z-index:1000;
 	display:inline-flex;
 	align-items:center;
 	gap:8px;
 	padding:8px 12px;
 	border-radius:999px;
-	background:rgba(26,115,232,0.06);
-	color:#1a73e8;
-	border:1px solid rgba(26,115,232,0.14);
+	background:#f8f9fa; /* 변경: 배경색 */
+	color:#5f6368; /* 변경: 글자색 */
+	border:1px solid #dadce0; /* 변경: 테두리색 */
 	text-decoration:none;
 	font-weight:600;
 	font-size:13px;
-	box-shadow:0 2px 6px rgba(0,0,0,0.06);
+	box-shadow:0 1px 2px rgba(0,0,0,0.08); /* 변경: 그림자 */
 }
 .top-right-support:hover,
 .top-right-support:focus{
-	background:rgba(26,115,232,0.12);
+	background:#e8eaed; /* 변경: 호버/포커스 배경색 */
+	color:#202124; /* 추가: 호버/포커스 글자색 */
 	outline:none;
-	box-shadow:0 4px 12px rgba(26,115,232,0.12);
+	box-shadow:0 1px 3px rgba(0,0,0,0.12); /* 변경: 호버/포커스 그림자 */
 }
 
 /* 변경: 로그인 위젯 컨테이너 (우측 상단 고정) */
 .auth-widget {
     position: fixed;
     top: 16px;
-    right: 100px; /* Support 버튼과의 간격을 넓히기 위해 right 값 증가 */
+    right: 314px; /* Support 버튼 옆으로 이동 (약 16px 간격) */
     z-index: 1000;
     display: flex;
     align-items: center;
