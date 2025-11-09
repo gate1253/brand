@@ -39,9 +39,9 @@ function renderResult(shortUrl){
 			<a href="${shortUrl}" target="_blank" rel="noopener noreferrer" id="result-link" style="font-weight:600;color:#1a73e8;word-break:break-all;">${shortUrl}</a>
 		</div>
 		<div class="result-actions" style="display:flex;gap:8px;align-items:center">
-			<button id="copy-btn" class="btn primary" type="button">복사</button>
+			<button id="copy-btn" class="btn primary" type="button">COPY</button>
 			<button id="qr-code-btn" class="btn primary" type="button">QR</button>
-			<button id="create-new" class="btn primary" type="button">새로 만들기</button>
+			<button id="create-new" class="btn primary" type="button">CREATE</button>
 		</div>
 	`;
 	// 복사 동작
