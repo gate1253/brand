@@ -11,7 +11,7 @@ const customCodeNote = document.getElementById('custom-code-note');
 function renderForm() {
 	searchBox.innerHTML = `
 		<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)" aria-label="원본 URL" />
-		<button id="shorten-btn" type="button" class="btn primary">단축 생성</button>
+		<button id="shorten-btn" type="button" class="btn primary">CREATE</button>
 	`;
 	msg.textContent = '';
 	document.getElementById('shorten-btn').addEventListener('click', handleShorten);
