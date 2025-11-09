@@ -297,7 +297,7 @@ async function handleAuthCallback(request, env) {
 
 
 export async function handleRequest(request, env){
-	return new Response(null, JSON.stringify(request, null, 2), {
+	return new Response("HELLO", {
 			status: 200, // 디버깅 응답 자체는 200으로 반환
 			headers: { 'Content-Type': 'application/json' },
 		});
