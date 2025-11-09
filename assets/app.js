@@ -10,7 +10,7 @@ const customCodeNote = document.getElementById('custom-code-note');
 // 렌더: 입력 폼 (input + 단축 버튼)
 function renderForm() {
 	searchBox.innerHTML = `
-		<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com/long/path)" aria-label="원본 URL" />
+		<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)" aria-label="원본 URL" />
 		<button id="shorten-btn" type="button" class="btn primary">단축 생성</button>
 	`;
 	msg.textContent = '';
