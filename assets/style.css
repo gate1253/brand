@@ -74,7 +74,7 @@ body{
 }
 #url-input,
 #alias-input { /* 추가: #alias-input에도 동일한 입력 필드 스타일 적용 */
-	min-width: 400px;
+	min-width: 450px;
 	flex:1;
 	border:none;
 	outline:none;

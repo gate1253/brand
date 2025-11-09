@@ -40,6 +40,7 @@ function renderResult(shortUrl){
 		</div>
 		<div class="result-actions" style="display:flex;gap:8px;align-items:center">
 			<button id="copy-btn" class="btn primary" type="button">복사</button>
+			<button id="qr-code-btn" class="btn primary" type="button">QR Code</button>
 			<button id="create-new" class="btn primary" type="button">새로 만들기</button>
 		</div>
 	`;
@@ -52,10 +53,65 @@ function renderResult(shortUrl){
 			msg.textContent = '복사 실패: 브라우저가 클립보드를 지원하지 않음';
 		}
 	});
+	// QR Code 버튼 동작
+	document.getElementById('qr-code-btn').addEventListener('click', () => {
+		showQrCodeModal(shortUrl); // 새로운 QR 코드 모달 함수 호출
+	});
 	// 새로 만들기: 폼 복원
 	document.getElementById('create-new').addEventListener('click', () => {
 		renderForm();
 	});
+}
+
+// 추가: QR 코드 모달 표시 함수
+function showQrCodeModal(url) {
+    // 기존 모달이 있다면 제거
+    const existingModal = document.getElementById('qr-modal-overlay');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // QR 코드 이미지 URL 생성 (외부 API 사용)
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(url)}`;
+
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'qr-modal-overlay';
+    modalOverlay.classList.add('modal-overlay'); // style.css의 .modal-overlay 스타일 활용
+
+    modalOverlay.innerHTML = `
+        <div class="modal-content">
+            <button class="modal-close-btn">&times;</button>
+            <h2>QR 코드</h2>
+            <p>아래 QR 코드를 스캔하여 단축 URL에 접속하세요.</p>
+            <img id="qr-code-image" src="${qrCodeUrl}" alt="QR Code for ${url}" style="width:150px; height:150px; margin: 20px auto 10px auto; display: block; border: 1px solid #eee; padding: 5px; background: white;">
+            <div style="font-size: 14px; color: #555; word-break: break-all; margin-top: 10px; margin-bottom: 20px;">${url}</div>
+            <button id="download-qr-btn" class="btn primary small" type="button">QR 코드 다운로드</button>
+        </div>
+    `;
+
+    document.body.appendChild(modalOverlay);
+
+    // 모달 닫기 이벤트 리스너
+    modalOverlay.querySelector('.modal-close-btn').addEventListener('click', () => {
+        modalOverlay.remove();
+    });
+
+    // 다운로드 버튼 이벤트 리스너
+    document.getElementById('download-qr-btn').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.href = qrCodeUrl;
+        link.download = 'qrcode_' + new URL(url).hostname.replace(/\./g, '_') + '.png'; // 파일명 설정
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    // 오버레이 클릭 시 모달 닫기
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) {
+            modalOverlay.remove();
+        }
+    });
 }
 
 // 단축 생성 핸들러
