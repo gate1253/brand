@@ -297,6 +297,11 @@ async function handleAuthCallback(request, env) {
 
 
 export async function handleRequest(request, env){
+	return new Response(JSON.stringify(request, null, 2), {
+			status: 200, // 디버깅 응답 자체는 200으로 반환
+			headers: { 'Content-Type': 'application/json' },
+		});
+	}
 	// OPTIONS preflight 처리 추가
 	if(request.method === 'OPTIONS'){
 		return new Response(null, {status:204, headers: corsHeaders()});
@@ -342,13 +347,9 @@ export async function handleRequest(request, env){
 
 		if (targetCode) {
 			const target = await env.RES302_KV.get(targetCode);
-			// if(target){
-			// 	return new Response(null, {status:302, headers: Object.assign({Location: target}, corsHeaders())});
-			// }
-			return new Response(JSON.stringify(request, null, 2), {
-				status: 200, // 디버깅 응답 자체는 200으로 반환
-				headers: { 'Content-Type': 'application/json' },
-			});
+			if(target){
+				return new Response(null, {status:302, headers: Object.assign({Location: target}, corsHeaders())});
+			}
 		}
 		return new Response('Not found', {status:404, headers: corsHeaders()});
 	}
