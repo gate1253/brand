@@ -149,7 +149,7 @@ body{
 .top-right-doc {
     position: fixed;
     top: 16px;
-    left: 182px; /* Intro 링크 옆으로 이동 (약 8px 간격) */
+    left: 80px; /* Intro 링크 옆으로 이동 (약 8px 간격) */
     z-index: 1000;
     display: inline-flex;
     align-items: center;
@@ -176,7 +176,7 @@ body{
 .top-right-intro {
     position: fixed;
     top: 16px;
-    left: 104px; /* Support 링크 옆으로 이동 (약 8px 간격) */
+    left: 16px; /* 왼쪽 상단으로 이동 */
     z-index: 1000;
     display: inline-flex;
     align-items: center;
@@ -203,7 +203,8 @@ body{
 .top-right-support{
 	position:fixed;
 	top:16px;
-	left:16px; /* 왼쪽 상단으로 이동 */
+	right:16px; /* 가장 오른쪽 상단으로 이동 */
+	left:unset; /* left 속성 제거 */
 	z-index:1000;
 	display:inline-flex;
 	align-items:center;
@@ -230,7 +231,7 @@ body{
 .auth-widget {
     position: fixed;
     top: 16px;
-    right: 16px; /* 오른쪽 상단으로 이동 */
+    right: 100px; /* Support 버튼의 왼쪽에 배치 */
     z-index: 1000;
     display: flex;
     align-items: center;
