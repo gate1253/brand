@@ -76,7 +76,7 @@ body{
 	flex:1;
 	border:none;
 	outline:none;
-	font-size:13px;
+	font-size:18px; /* 폰트 사이즈를 18px로 변경 */
 	padding:8px;
 	background:transparent;
 }
