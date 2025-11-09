@@ -301,7 +301,7 @@ export async function handleRequest(request, env){
 			status: 200, // 디버깅 응답 자체는 200으로 반환
 			headers: { 'Content-Type': 'application/json' },
 		});
-	}
+	
 	// OPTIONS preflight 처리 추가
 	if(request.method === 'OPTIONS'){
 		return new Response(null, {status:204, headers: corsHeaders()});
