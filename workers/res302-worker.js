@@ -315,9 +315,9 @@ export async function handleRequest(request, env){
 		return handleShorten(request, env);
 	}
 	// API: GET /api/list
-	// if(request.method === 'GET' && pathname === '/api/list'){
-	// 	return handleList(env);
-	// }
+	if(request.method === 'GET' && pathname === '/api/list'){
+		return handleList(env);
+	}
 	// 리다이렉트: GET /{code} 또는 /{uniqueUserId}/{code}
 	if(request.method === 'GET' && pathname.length > 1){
 		const fullPath = pathname.slice(1); // 예: "user123abcde/my/custom/code" 또는 "abc123"
