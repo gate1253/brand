@@ -40,7 +40,7 @@ function renderResult(shortUrl){
 		</div>
 		<div class="result-actions" style="display:flex;gap:8px;align-items:center">
 			<button id="copy-btn" class="btn primary" type="button">복사</button>
-			<button id="qr-code-btn" class="btn primary" type="button">QR Code</button>
+			<button id="qr-code-btn" class="btn primary" type="button">QR</button>
 			<button id="create-new" class="btn primary" type="button">새로 만들기</button>
 		</div>
 	`;
