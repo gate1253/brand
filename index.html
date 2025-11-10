@@ -5,6 +5,23 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>RES302</title>
 	<link rel="stylesheet" href="assets/style.css" />
+	<style>
+		.top-right-doc.active {
+			background: #e8f0fe;
+			color: #1967d2;
+			font-weight: 600;
+		}
+		.logo {
+			width: 260px;
+			object-fit: contain;
+		}
+		@media (max-width:1200px){
+			.logo{width: 180px;}
+		}
+		@media (max-width:560px){
+			.logo{width: 112px;}
+		}
+	</style>
 </head>
 <body>
 	<!-- 추가: 우측 상단 고정 Support 링크 -->
@@ -13,13 +30,15 @@
 	<a class="top-right-intro" href="/support/intro.mp4" target="_blank" rel="noopener noreferrer" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
 	<!-- 추가: 우측 상단 presentation.pdf 링크 -->
 	<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer" title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
+	<a id="res302-btn" class="top-right-doc active" href="#" title="RES302" aria-label="RES302" style="left: 205px;">RES302</a>
+	<a id="res200-btn" class="top-right-doc" href="#" title="RES200" aria-label="RES200" style="left: 283px;">RES200</a>
 	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
 	<div id="auth-container" class="auth-widget"></div>
 
 	<main class="container" role="main">
 		<!-- 중앙 정렬된 로고 + 간단 설명 -->
 		<div class="brand" role="banner">
-			<img class="logo" src="assets/images/logo.png" alt="RES302">
+			<img id="logo-img" class="logo" src="assets/images/res302.png" alt="RES302">
 			<p class="lead" style="margin-top:0">간단하고 빠른 단축 URL 생성 서비스</p>
 		</div>
 
@@ -136,6 +155,31 @@
 				} catch (err) {
 					modalMessage.textContent = '고유 사용자 ID 복사 실패.';
 					console.error('Failed to copy Unique User ID:', err);
+				}
+			});
+
+			// 추가: RES302/RES200 토글 로직
+			const res302Btn = document.getElementById('res302-btn');
+			const res200Btn = document.getElementById('res200-btn');
+			const logoImg = document.getElementById('logo-img');
+
+			res302Btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				if (!res302Btn.classList.contains('active')) {
+					res302Btn.classList.add('active');
+					res200Btn.classList.remove('active');
+					logoImg.src = 'assets/images/res302.png';
+					logoImg.alt = 'RES302';
+				}
+			});
+
+			res200Btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				if (!res200Btn.classList.contains('active')) {
+					res200Btn.classList.add('active');
+					res302Btn.classList.remove('active');
+					logoImg.src = 'assets/images/res200.png';
+					logoImg.alt = 'RES200';
 				}
 			});
 		});
