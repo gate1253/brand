@@ -149,10 +149,21 @@ async function handleShorten(req, env){
 
 		await env.RES302_KV.put(CODE_KEY, JSON.stringify(list));
 		
-		const shortUrl = `${new URL(req.url).origin}/${fullRedirectPath}`;
 		const status = operationType === 'update' ? 200 : 201;
 		const message = operationType === 'update' ? 'URL이 업데이트되었습니다.' : '단축 URL이 생성되었습니다.';
-		return jsonResponse({ok:true, code: fullRedirectPath, shortUrl, message}, status);
+		
+		const responsePayload = {
+			ok: true,
+			code: fullRedirectPath,
+			shortUrl: `https://r3.ggm.kr/${fullRedirectPath}`,
+			message
+		};
+
+		if (alias) {
+			responsePayload.shortUrl2 = `https://r2.ggm.kr/${fullRedirectPath}`;
+		}
+
+		return jsonResponse(responsePayload, status);
 	}catch(e){
 		console.error('handleShorten error:', e); // 오류 로깅 추가
 		return jsonResponse({error:'서버 오류'}, 500);
