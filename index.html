@@ -6,7 +6,28 @@
 	<title>RES302</title>
 	<link rel="stylesheet" href="assets/style.css" />
 	<style>
-		.top-right-doc.active {
+		.service-toggle-btn {
+			display: inline-flex;
+			align-items: center;
+			padding: 8px 12px;
+			border-radius: 999px;
+			background: #f8f9fa;
+			color: #5f6368;
+			border: 1px solid #dadce0;
+			text-decoration: none;
+			font-weight: 600;
+			font-size: 13px;
+			box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+			cursor: pointer;
+		}
+		.service-toggle-btn:hover,
+		.service-toggle-btn:focus {
+			background: #e8eaed;
+			color: #202124;
+			outline: none;
+			box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+		}
+		.service-toggle-btn.active {
 			background: #e8f0fe;
 			color: #1967d2;
 			font-weight: 600;
@@ -21,17 +42,55 @@
 		@media (max-width:560px){
 			.logo{width: 112px;}
 		}
+		/* 추가: 비디오 모달 관련 스타일 */
+		.modal-overlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(0, 0, 0, 0.8);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 1000;
+		}
+		.modal-content {
+			position: relative;
+			background: #fff;
+			padding: 0;
+			margin: 0;
+			border-radius: 8px;
+			max-width: 90%;
+			max-height: 80%;
+			overflow: hidden;
+		}
+		.close-button {
+			position: absolute;
+			top: 10px;
+			right: 10px;
+			background: none;
+			border: none;
+			color: #333;
+			font-size: 24px;
+			cursor: pointer;
+		}
+		#video-container {
+			width: 100%;
+			height: 100%;
+		}
+		.hidden {
+			display: none;
+		}
 	</style>
 </head>
 <body>
 	<!-- 추가: 우측 상단 고정 Support 링크 -->
 	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
 	<!-- 추가: 우측 상단 Intro MP4 링크 -->
-	<a class="top-right-intro" href="/support/intro.mp4" target="_blank" rel="noopener noreferrer" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
+	<a class="top-right-intro" href="/support/intro.mp4" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
 	<!-- 추가: 우측 상단 presentation.pdf 링크 -->
 	<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer" title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
-	<a id="res302-btn" class="top-right-doc active" href="#" title="RES302" aria-label="RES302" style="left: 205px;">RES302</a>
-	<a id="res200-btn" class="top-right-doc" href="#" title="RES200" aria-label="RES200" style="left: 283px;">RES200</a>
 	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
 	<div id="auth-container" class="auth-widget"></div>
 
@@ -39,6 +98,10 @@
 		<!-- 중앙 정렬된 로고 + 간단 설명 -->
 		<div class="brand" role="banner">
 			<img id="logo-img" class="logo" src="assets/images/res302.png" alt="RES302">
+			<div class="service-toggle" style="margin-bottom: 16px; display: flex; gap: 8px;">
+				<a id="res302-btn" class="service-toggle-btn active" href="#" title="RES302" aria-label="RES302">RES302</a>
+				<a id="res200-btn" class="service-toggle-btn hidden" href="#" title="RES200" aria-label="RES200">RES200</a>
+			</div>
 			<p class="lead" style="margin-top:0">간단하고 빠른 단축 URL 생성 서비스</p>
 		</div>
 
@@ -88,15 +151,26 @@
 		</div>
 	</div>
 
+	<!-- 추가: 비디오 모달 -->
+	<div id="video-modal" class="modal-overlay hidden">
+		<div class="modal-content">
+			<button class="close-button" id="close-video-modal">&times;</button>
+			<div id="video-container"></div>
+		</div>
+	</div>
+
 	<script src="/member/auth.js" defer></script>
 	<script src="assets/app.js" defer></script>
+	<script src="assets/script.js" defer></script>
 	<script>
 		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
 		document.addEventListener('DOMContentLoaded', () => {
 			const authContainer = document.getElementById('auth-container');
 			const user = window.getCurrentUser();
+			const res200Btn = document.getElementById('res200-btn');
 
 			if (user) {
+				res200Btn.classList.remove('hidden');
 				// 로그인된 경우: 프로필 사진과 로그아웃 버튼 표시
 				const userName = user.name || 'User profile';
 				authContainer.innerHTML = `
@@ -160,7 +234,6 @@
 
 			// 추가: RES302/RES200 토글 로직
 			const res302Btn = document.getElementById('res302-btn');
-			const res200Btn = document.getElementById('res200-btn');
 			const logoImg = document.getElementById('logo-img');
 
 			res302Btn.addEventListener('click', (e) => {
@@ -180,6 +253,115 @@
 					res302Btn.classList.remove('active');
 					logoImg.src = 'assets/images/res200.png';
 					logoImg.alt = 'RES200';
+				}
+			});
+
+			// 추가: 단축 URL 생성 로직
+			const shortenBtn = document.getElementById('shorten-btn');
+			const urlInput = document.getElementById('url-input');
+			const aliasInput = document.getElementById('alias-input');
+			const aliasContainer = document.getElementById('alias-input-container');
+			const customCodeNote = document.getElementById('custom-code-note');
+			const msgDiv = document.getElementById('msg');
+			const searchBox = document.querySelector('.search-box');
+
+			// 로그인 상태에 따라 커스텀 입력 필드 표시
+			if (window.getCurrentUser()) {
+				aliasContainer.classList.remove('hidden');
+				customCodeNote.style.display = 'none';
+			}
+
+			shortenBtn.addEventListener('click', async () => {
+				const url = urlInput.value.trim();
+				if (!url) {
+					msgDiv.textContent = 'URL을 입력해주세요.';
+					return;
+				}
+
+				const alias = aliasInput.value.trim();
+				const user = window.getCurrentUser();
+
+				if (alias && !user) {
+					msgDiv.textContent = '커스텀 코드를 사용하려면 로그인이 필요합니다.';
+					return;
+				}
+
+				msgDiv.textContent = '생성 중...';
+				shortenBtn.disabled = true;
+
+				try {
+					const payload = { url };
+					if (alias) payload.alias = alias;
+
+					const headers = { 'Content-Type': 'application/json' };
+					if (user && user.apiKey) {
+						headers['Authorization'] = `Bearer ${user.apiKey}`;
+					}
+
+					const response = await fetch('/api/shorten', {
+						method: 'POST',
+						headers,
+						body: JSON.stringify(payload)
+					});
+
+					const data = await response.json();
+
+					if (!response.ok) {
+						throw new Error(data.error || '알 수 없는 오류가 발생했습니다.');
+					}
+
+					const isRes200Mode = res200Btn.classList.contains('active');
+					const resultUrl = (isRes200Mode && data.shortUrl2) ? data.shortUrl2 : data.shortUrl;
+
+					searchBox.style.display = 'none';
+					aliasContainer.style.display = 'none';
+					
+					msgDiv.innerHTML = `
+						<div class="result-box" style="text-align:center;">
+							<p style="margin-bottom: 10px;">${data.message}</p>
+							<div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; padding: 4px 12px; border-radius: 8px; border: 1px solid #e0e0e0;">
+								<a href="${resultUrl}" target="_blank" rel="noopener noreferrer">${resultUrl}</a>
+								<button class="btn primary small" onclick="navigator.clipboard.writeText('${resultUrl}').then(() => this.textContent='복사됨!')">복사</button>
+							</div>
+							<br>
+							<button class="btn secondary" style="margin-top: 15px;" onclick="window.location.reload()">새로 만들기</button>
+						</div>
+					`;
+
+				} catch (error) {
+					msgDiv.textContent = `오류: ${error.message}`;
+				} finally {
+					shortenBtn.disabled = false;
+				}
+			});
+
+			// 추가: 비디오 모달 관련 스크립트
+			const introLink = document.querySelector('.top-right-intro');
+			const videoModal = document.getElementById('video-modal');
+			const closeVideoModal = document.getElementById('close-video-modal');
+			const videoContainer = document.getElementById('video-container');
+
+			introLink.addEventListener('click', function(event) {
+				event.preventDefault();
+				const videoUrl = this.getAttribute('href');
+				videoContainer.innerHTML = `
+					<video style="display: block; width: 100%; height: 100%;" controls autoplay playsinline>
+						<source src="${videoUrl}" type="video/mp4">
+						죄송합니다. 비디오를 재생할 수 없습니다.
+					</video>
+				`;
+				videoModal.classList.remove('hidden');
+			});
+
+			closeVideoModal.addEventListener('click', function() {
+				videoModal.classList.add('hidden');
+				videoContainer.innerHTML = ''; // 비디오 정지
+			});
+
+			videoModal.addEventListener('click', function(e) {
+				if (e.target === this) {
+					this.classList.add('hidden');
+					videoContainer.innerHTML = ''; // 비디오 정지
 				}
 			});
 		});

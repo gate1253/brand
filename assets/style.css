@@ -480,3 +480,37 @@ body{
 	.result-inline a{word-break:break-word}
 	.result-inline .btn{margin-left:0;width:100%}
 }
+
+/* 추가: 비디오 모달 스타일 (영상 크기에 맞춤) */
+#video-modal .modal-content {
+    /* 기존 .modal-content 스타일 오버라이드 */
+    background: transparent;
+    padding: 0;
+    width: auto;
+    height: auto;
+    max-width: none;
+    box-shadow: none;
+    overflow: visible; /* 닫기 버튼이 보이도록 */
+    border-radius: 8px;
+}
+
+#video-modal .close-button {
+    position: absolute;
+    top: -35px;
+    right: -5px;
+    font-size: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #fff;
+    background: none;
+    border: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    line-height: 1;
+}
+
+#video-modal #video-container video {
+    display: block;
+    max-width: 90vw; /* 뷰포트 너비의 90%를 넘지 않도록 */
+    max-height: 90vh; /* 뷰포트 높이의 90%를 넘지 않도록 */
+    border-radius: 8px;
+}

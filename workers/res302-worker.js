@@ -155,12 +155,16 @@ async function handleShorten(req, env){
 		const responsePayload = {
 			ok: true,
 			code: fullRedirectPath,
-			shortUrl: `https://r3.ggm.kr/${fullRedirectPath}`,
 			message
 		};
 
 		if (alias) {
+			// 커스텀 코드(alias)가 있는 경우, r3.ggm.kr을 shortUrl로, r2.ggm.kr을 shortUrl2로 설정
+			responsePayload.shortUrl = `https://r3.ggm.kr/${fullRedirectPath}`;
 			responsePayload.shortUrl2 = `https://r2.ggm.kr/${fullRedirectPath}`;
+		} else {
+			// 랜덤 코드인 경우 RES302 URL(r3.ggm.kr)을 shortUrl로 설정
+			responsePayload.shortUrl = `https://r3.ggm.kr/${fullRedirectPath}`;
 		}
 
 		return jsonResponse(responsePayload, status);
