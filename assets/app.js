@@ -1,4 +1,4 @@
-const API_BASE = 'https://res302.gate1253.workers.dev';
+const API_BASE = 'https://api.gate1253.workers.dev';
 // 메시지 영역
 const msg = document.getElementById('msg');
 // 검색 폼 컨테이너

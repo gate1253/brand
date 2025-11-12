@@ -22,11 +22,11 @@
   <div class="wrap" role="main">
     <a class="back" href="/" aria-label="홈으로 돌아가기">← 홈으로 돌아가기</a>
     <h1>API 사용 예제</h1>
-    <p>단축 URL 생성 API 엔드포인트: <code>https://res302.gate1253.workers.dev/api/shorten</code></p>
+    <p>단축 URL 생성 API 엔드포인트: <code>https://api.gate1253.workers.dev/api/shorten</code></p>
     <p>로그인 사용자(커스텀 코드)는 API 키를 <code>Authorization: Bearer &lt;YOUR_API_KEY&gt;</code> 헤더에 포함해야 합니다. <code>uniqueUserId</code>는 API 키를 통해 워커에서 자동으로 검증됩니다.</p>
 
     <h2>1) 로그인 사용자 예제 (커스텀 코드)</h2>
-    <pre><code>curl -X POST "https://res302.gate1253.workers.dev/api/shorten" \
+    <pre><code>curl -X POST "https://api.gate1253.workers.dev/api/shorten" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY_HERE" \
   -d '{
@@ -38,13 +38,13 @@
     <pre><code>{
   "ok": true,
   "code": "YOUR_UNIQUE_USER_ID/mycustomcode",
-  "shortUrl": "https://res302.gate1253.workers.dev/YOUR_UNIQUE_USER_ID/mycustomcode",
+  "shortUrl": "https://api.gate1253.workers.dev/YOUR_UNIQUE_USER_ID/mycustomcode",
   "message": "단축 URL이 생성되었습니다."
 }
 </code></pre>
 
     <h2>1.1) 비회원 예제 (무작위 코드)</h2>
-    <pre><code>curl -X POST "https://res302.gate1253.workers.dev/api/shorten" \
+    <pre><code>curl -X POST "https://api.gate1253.workers.dev/api/shorten" \
   -H "Content-Type: application/json" \
   -d '{
     "url":"https://example.com/another/long/path"
@@ -54,13 +54,13 @@
     <pre><code>{
   "ok": true,
   "code": "a1B2c3",
-  "shortUrl": "https://res302.gate1253.workers.dev/a1B2c3",
+  "shortUrl": "https://api.gate1253.workers.dev/a1B2c3",
   "message": "단축 URL이 생성되었습니다."
 }
 </code></pre>
 
     <h2>2) JavaScript (fetch) 예제 (로그인 사용자 - 커스텀 코드)</h2>
-    <pre><code>const API_BASE = 'https://res302.gate1253.workers.dev';
+    <pre><code>const API_BASE = 'https://api.gate1253.workers.dev';
 const YOUR_API_KEY = 'YOUR_API_KEY_HERE'; // 실제 API 키로 교체
 
 async function shortenWithCustomCode(originalUrl, customAlias) {
@@ -89,7 +89,7 @@ shortenWithCustomCode('https://example.com/long/path/to/resource', 'mycustomcode
 </code></pre>
 
     <h2>2.1) JavaScript (fetch) 예제 (비회원 - 무작위 코드)</h2>
-    <pre><code>const API_BASE = 'https://res302.gate1253.workers.dev';
+    <pre><code>const API_BASE = 'https://api.gate1253.workers.dev';
 
 async function shortenAnonymous(originalUrl) {
   const headers = { 'Content-Type': 'application/json' };
@@ -126,7 +126,7 @@ shortenAnonymous('https://example.com/another/long/path')
 
     <script>
       (function(){
-        const API_BASE = 'https://res302.gate1253.workers.dev';
+        const API_BASE = 'https://api.gate1253.workers.dev';
         const btn = document.getElementById('demo-btn');
         const resetBtn = document.getElementById('demo-reset-btn');
         const urlInput = document.getElementById('demo-url');

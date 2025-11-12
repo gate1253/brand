@@ -33,7 +33,7 @@
         *   `your-domain.com/*` (리다이렉트 및 정적 파일 서빙)
 
 ## API 명세
-Base: `https://res302.gate1253.workers.dev` (배포 도메인으로 교체)
+Base: `https://api.gate1253.workers.dev` (배포 도메인으로 교체)
 
 ### 1) `POST /api/shorten`
 -   **설명**: 단축 URL 생성 또는 업데이트
@@ -54,7 +54,7 @@ Base: `https://res302.gate1253.workers.dev` (배포 도메인으로 교체)
         {
           "ok": true,
           "code": "YOUR_UNIQUE_USER_ID/mycustomcode",
-          "shortUrl": "https://res302.gate1253.workers.dev/YOUR_UNIQUE_USER_ID/mycustomcode",
+          "shortUrl": "https://api.gate1253.workers.dev/YOUR_UNIQUE_USER_ID/mycustomcode",
           "message": "단축 URL이 생성되었습니다." // 또는 "URL이 업데이트되었습니다."
         }
         ```
@@ -63,7 +63,7 @@ Base: `https://res302.gate1253.workers.dev` (배포 도메인으로 교체)
         {
           "ok": true,
           "code": "abc123",
-          "shortUrl": "https://res302.gate1253.workers.dev/abc123",
+          "shortUrl": "https://api.gate1253.workers.dev/abc123",
           "message": "단축 URL이 생성되었습니다."
         }
         ```
@@ -151,7 +151,7 @@ GitHub Actions를 사용하여 Cloudflare Workers에 자동 배포합니다.
 4.  **Google Cloud Console OAuth 클라이언트 설정**:
     *   Google Cloud Console > API 및 서비스 > 사용자 인증 정보로 이동합니다.
     *   **OAuth 클라이언트 ID**를 생성하고, 애플리케이션 유형을 **"웹 애플리케이션"**으로 선택합니다.
-    *   **"승인된 리디렉션 URI"**에 `https://{배포-도메인}/member/callback.html`을 정확히 추가합니다. (예: `https://res302.gate1253.workers.dev/member/callback.html`)
+    *   **"승인된 리디렉션 URI"**에 `https://{배포-도메인}/member/callback.html`을 정확히 추가합니다. (예: `https://api.gate1253.workers.dev/member/callback.html`)
     *   생성된 **클라이언트 ID**와 **클라이언트 보안 비밀**을 복사하여 GitHub Secrets에 `GOOGLE_CLIENT_ID`와 `GOOGLE_SECRET`으로 각각 등록합니다.
 
 5.  **`auth.js` CLIENT_ID 업데이트**:

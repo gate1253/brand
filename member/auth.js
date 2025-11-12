@@ -64,7 +64,7 @@
 
     // 변경: 코드를 Google에 직접 보내는 대신, 워커(백엔드)로 전송합니다.
     // 워커가 안전하게 토큰 교환을 처리합니다.
-    const WORKER_AUTH_ENDPOINT = 'https://res302.gate1253.workers.dev/api/member';
+    const WORKER_AUTH_ENDPOINT = 'https://api.gate1253.workers.dev/api/member';
 
     const res = await fetch(WORKER_AUTH_ENDPOINT, {
       method: 'POST',
