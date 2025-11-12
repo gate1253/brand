@@ -38,7 +38,7 @@
     const code_verifier = randString(64);
     const code_challenge = await sha256(code_verifier);
     // persist verifier (short-lived)
-    localStorage.setItem('res302_pkce', JSON.stringify({code_verifier, ts: Date.now(), action}));
+    localStorage.setItem('gate1253_pkce', JSON.stringify({code_verifier, ts: Date.now(), action}));
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
       redirect_uri: REDIRECT_URI,
@@ -59,7 +59,7 @@
     if(error) throw new Error('auth_error:' + error);
     if(!code) throw new Error('no_code');
 
-    const pkce = JSON.parse(localStorage.getItem('res302_pkce') || '{}');
+    const pkce = JSON.parse(localStorage.getItem('gate1253_pkce') || '{}');
     if(!pkce || !pkce.code_verifier) throw new Error('no_pkce');
 
     // 변경: 코드를 Google에 직접 보내는 대신, 워커(백엔드)로 전송합니다.
@@ -96,9 +96,9 @@
     }
 
     // persist tokens/profile/apiKey/uniqueUserId (short-lived)
-    localStorage.setItem('res302_tokens', JSON.stringify({tokens, profile, apiKey, uniqueUserId, ts: Date.now()}));
+    localStorage.setItem('gate1253_tokens', JSON.stringify({tokens, profile, apiKey, uniqueUserId, ts: Date.now()}));
     // cleanup pkce
-    localStorage.removeItem('res302_pkce');
+    localStorage.removeItem('gate1253_pkce');
     // optionally redirect to member area or return profile
     return profile; // 프로필만 반환해도 되지만, localStorage에는 모든 정보가 저장됨
   };
@@ -106,7 +106,7 @@
   // helper to get current user
   window.getCurrentUser = function(){
     try{
-      const s = JSON.parse(localStorage.getItem('res302_tokens') || '{}');
+      const s = JSON.parse(localStorage.getItem('gate1253_tokens') || '{}');
       // 변경: 프로필과 함께 apiKey, uniqueUserId도 반환
       return s.profile ? { ...s.profile, apiKey: s.apiKey, uniqueUserId: s.uniqueUserId } : null;
     }catch(e){ return null; }
@@ -114,8 +114,8 @@
 
   // 추가: 로그아웃 기능
   window.logout = function() {
-    localStorage.removeItem('res302_tokens');
-    localStorage.removeItem('res302_pkce'); // 혹시 모를 잔여 데이터 정리
+    localStorage.removeItem('gate1253_tokens');
+    localStorage.removeItem('gate1253_pkce'); // 혹시 모를 잔여 데이터 정리
     location.reload(); // UI를 업데이트하기 위해 페이지 새로고침
   };
 
