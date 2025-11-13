@@ -35,7 +35,7 @@ body{
 
 /* 로고: 약간 확대 (데스크탑/중간/모바일) */
 .logo{
-	height:260px; /* 데스크탑 기본 크기 (조금 더 크게) */
+	height:300px; /* 데스크탑 기본 크기 (조금 더 크게) */
 	width:auto;
 	display:block;
 }
