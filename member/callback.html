@@ -25,11 +25,9 @@
       const status = document.getElementById('status');
       try{
         status.textContent = '인증 코드 교환 중...';
-        const userData = await window.handleCallback(); // 사용자 정보와 API 키가 포함된 객체를 반환
-        if(userData && userData.apiKey){
+        const profile = await window.handleCallback(); // auth.js가 localStorage에 정보를 저장합니다.
+        if(profile){
           status.textContent = '인증이 완료되었습니다. 홈으로 이동합니다.';
-          // 성공 시, 사용자 정보를 localStorage에 저장하고 홈으로 리디렉션
-          localStorage.setItem('user', JSON.stringify(userData));
           location.href = '/';
         }else{
           status.textContent = '인증에 실패했습니다.';

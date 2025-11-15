@@ -22,44 +22,66 @@
   <div class="wrap" role="main">
     <a class="back" href="/" aria-label="홈으로 돌아가기">← 홈으로 돌아가기</a>
     <h1>API 사용 예제</h1>
-    <p>단축 URL 생성 API 엔드포인트: <code>https://api.gate1253.workers.dev/api/shorten</code></p>
-    <p>로그인 사용자(커스텀 코드)는 API 키를 <code>Authorization: Bearer &lt;YOUR_API_KEY&gt;</code> 헤더에 포함해야 합니다. <code>uniqueUserId</code>는 API 키를 통해 워커에서 자동으로 검증됩니다.</p>
+    <p>단축 URL 생성 API 엔드포인트는 <code>POST /api/shorten</code> 입니다.</p>
+    <p>로그인 사용자는 API 키를 <code>Authorization: Bearer &lt;YOUR_API_KEY&gt;</code> 헤더에 포함해야 합니다. </p>
 
-    <h2>1) 로그인 사용자 예제 (커스텀 코드)</h2>
+    <h2>1) 로그인 사용자 예제 (r3 타입)</h2>
     <pre><code>curl -X POST "https://api.gate1253.workers.dev/api/shorten" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY_HERE" \
   -d '{
     "url":"https://example.com/long/path/to/resource",
-    "alias":"mycustomcode"
+    "alias":"mycustomcode",
+    "type": "r3"
   }'
 </code></pre>
     <p>응답 예시 (커스텀 코드):</p>
     <pre><code>{
   "ok": true,
   "code": "YOUR_UNIQUE_USER_ID/mycustomcode",
-  "shortUrl": "https://api.gate1253.workers.dev/YOUR_UNIQUE_USER_ID/mycustomcode",
+  "shortUrl": "https://r3.ggm.kr/YOUR_UNIQUE_USER_ID/mycustomcode",
   "message": "단축 URL이 생성되었습니다."
 }
 </code></pre>
 
-    <h2>1.1) 비회원 예제 (무작위 코드)</h2>
+    <h2>1.1) 비회원 예제 (r3 타입)</h2>
     <pre><code>curl -X POST "https://api.gate1253.workers.dev/api/shorten" \
   -H "Content-Type: application/json" \
   -d '{
-    "url":"https://example.com/another/long/path"
+    "url":"https://example.com/another/long/path",
+    "type": "r3"
   }'
 </code></pre>
     <p>응답 예시 (무작위 코드):</p>
     <pre><code>{
   "ok": true,
   "code": "a1B2c3",
-  "shortUrl": "https://api.gate1253.workers.dev/a1B2c3",
+  "shortUrl": "https://r3.ggm.kr/a1B2c3",
   "message": "단축 URL이 생성되었습니다."
 }
 </code></pre>
 
-    <h2>2) JavaScript (fetch) 예제 (로그인 사용자 - 커스텀 코드)</h2>
+    <h2>1.2) 로그인 사용자 예제 (R1 타입 - 만료 시간 지정)</h2>
+    <pre><code>curl -X POST "https://api.gate1253.workers.dev/api/shorten" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \
+  -d '{
+    "url":"https://example.com/secret-document",
+    "type": "r1",
+    "expiresAt": "2025-01-01T00:00:00",
+    "isUtc": true
+  }'
+</code></pre>
+    <p>응답 예시 (R1 타입):</p>
+    <pre><code>{
+  "ok": true,
+  "code": "YOUR_UNIQUE_USER_ID/a1B2c3",
+  "shortUrl": "https://r1.ggm.kr/YOUR_UNIQUE_USER_ID/a1B2c3",
+  "message": "단축 URL이 생성되었습니다."
+}
+</code></pre>
+
+    <h2>2) JavaScript (fetch) 예제 (r2 타입)</h2>
     <pre><code>const API_BASE = 'https://api.gate1253.workers.dev';
 const YOUR_API_KEY = 'YOUR_API_KEY_HERE'; // 실제 API 키로 교체
 
@@ -71,7 +93,8 @@ async function shortenWithCustomCode(originalUrl, customAlias) {
 
   const body = {
     url: originalUrl,
-    alias: customAlias
+    alias: customAlias,
+    type: 'r2'
   };
 
   const res = await fetch(`${API_BASE}/api/shorten`, {
@@ -83,17 +106,20 @@ async function shortenWithCustomCode(originalUrl, customAlias) {
 }
 
 // 사용 예:
-shortenWithCustomCode('https://example.com/long/path/to/resource', 'mycustomcode')
+shortenWithCustomCode('https://example.com/long/path/to/resource', 'my-secure-link')
   .then(data => console.log(data))
   .catch(err => console.error(err));
 </code></pre>
 
-    <h2>2.1) JavaScript (fetch) 예제 (비회원 - 무작위 코드)</h2>
+    <h2>2.1) JavaScript (fetch) 예제 (r3 타입)</h2>
     <pre><code>const API_BASE = 'https://api.gate1253.workers.dev';
 
 async function shortenAnonymous(originalUrl) {
   const headers = { 'Content-Type': 'application/json' };
-  const body = { url: originalUrl };
+  const body = { 
+    url: originalUrl,
+    type: 'r3' // 타입은 선택사항이며, 기본값은 'r3' 입니다.
+  };
 
   const res = await fetch(`${API_BASE}/api/shorten`, {
     method: 'POST',
@@ -110,12 +136,73 @@ shortenAnonymous('https://example.com/another/long/path')
 </code></pre>
     <p>참고: 브라우저에서 다른 오리진으로 호출할 경우 CORS preflight(OPTIONS)가 발생합니다. 서비스는 기본적으로 모든 오리진을 허용하도록 설정되어 있지만, 필요 시 도메인 제한을 적용하세요.</p>
 
+    <h2>2.2) JavaScript (fetch) 예제 (R1 타입 - 만료 시간 지정)</h2>
+    <pre><code>const API_BASE = 'https://api.gate1253.workers.dev';
+const YOUR_API_KEY = 'YOUR_API_KEY_HERE'; // 실제 API 키로 교체
+
+async function shortenWithExpiration(originalUrl, expirationDateTime) {
+  const headers = { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${YOUR_API_KEY}`
+  };
+
+  const body = { 
+    url: originalUrl,
+    type: 'r1',
+    expiresAt: expirationDateTime, // 예: "2025-12-31T23:59:59"
+    isUtc: true // 만료 시간이 UTC 기준인지 여부 (선택 사항, 기본값 false)
+  };
+
+  const res = await fetch(`${API_BASE}/api/shorten`, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// 사용 예:
+shortenWithExpiration('https://example.com/secret-document', '2025-01-01T00:00:00')
+  .then(data => console.log(data))
+  .catch(err => console.error(err));
+</code></pre>
+
+    <h2>2.3) JavaScript (fetch) 예제 (R5 타입)</h2>
+    <pre><code>const API_BASE = 'https://api.gate1253.workers.dev';
+
+async function shortenForLargeFile(originalUrl) {
+  const headers = { 'Content-Type': 'application/json' };
+  const body = { url: originalUrl, type: 'r5' };
+
+  const res = await fetch(`${API_BASE}/api/shorten`, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+</code></pre>
+
     <h2>3) 페이지 내 데모</h2>
     <div class="demo-section">
       <div class="demo-inputs">
-        <input id="demo-url" type="url" placeholder="원본 URL (예: https://example.com/long/path)" />
-        <input id="demo-api-key" type="text" placeholder="API Key (커스텀 코드 사용 시 필수, 비회원은 비워두세요)" />
-        <input id="demo-alias" type="text" placeholder="커스텀 코드 (선택 사항, 비회원은 비워두세요)" />
+        <input id="demo-url" type="url" placeholder="원본 URL (예: https://example.com)" required />
+        <input id="demo-api-key" type="text" placeholder="API Key (로그인 시 자동 입력)" />
+        <div id="demo-type-selector" style="display: flex; gap: 15px; margin: 5px 0;">
+          <label><input type="radio" name="demo-type" value="r1"> R1</label>
+          <label><input type="radio" name="demo-type" value="r2"> R2</label>
+          <label><input type="radio" name="demo-type" value="r3" checked> R3</label>
+          <label><input type="radio" name="demo-type" value="r5"> R5</label>
+        </div>
+        <div id="demo-alias-container">
+          <input id="demo-alias" type="text" placeholder="커스텀 코드 (선택 사항)" />
+        </div>
+        <div id="demo-expiration-container" class="hidden">
+          <input id="demo-expiration" type="datetime-local" placeholder="만료일 (R1 전용)" />
+          <label style="font-size: 12px; margin-left: 5px;">
+            <input type="checkbox" id="demo-utc-checkbox"> UTC
+          </label>
+        </div>
       </div>
       <div class="demo-actions">
         <button id="demo-btn">단축 생성</button>
@@ -133,46 +220,65 @@ shortenAnonymous('https://example.com/another/long/path')
         const urlInput = document.getElementById('demo-url');
         const apiKeyInput = document.getElementById('demo-api-key');
         const aliasInput = document.getElementById('demo-alias');
+        const aliasContainer = document.getElementById('demo-alias-container');
+        const expirationInput = document.getElementById('demo-expiration');
+        const expirationContainer = document.getElementById('demo-expiration-container');
+        const typeSelector = document.getElementById('demo-type-selector');
         const out = document.getElementById('demo-result');
 
         function resetDemo() {
           urlInput.value = '';
           apiKeyInput.value = '';
           aliasInput.value = '';
+          expirationInput.value = '';
+          document.querySelector('input[name="demo-type"][value="r3"]').checked = true;
           out.textContent = '';
           urlInput.focus();
 
-          // 로그인 상태 확인 후 API 키 자동 채우기
-          // DOMContentLoaded를 기다릴 필요 없이, auth.js 로드 후 실행되도록 함
-          document.addEventListener('DOMContentLoaded', () => {
-            const user = window.user || (window.getCurrentUser ? window.getCurrentUser() : null);
-            if (user && user.apiKey) {
-              apiKeyInput.value = user.apiKey;
-            }
-          });
+          // 로그인 상태 확인 후 API 키 자동 채우기 (auth.js 로드 후 실행)
+          const user = window.user || (window.getCurrentUser ? window.getCurrentUser() : null);
+          if (user && user.apiKey) {
+            apiKeyInput.value = user.apiKey;
+          }
         }
+
+        typeSelector.addEventListener('change', (e) => {
+            if (e.target.value === 'r1') {
+                aliasContainer.classList.add('hidden');
+                expirationContainer.classList.remove('hidden');
+            } else {
+                aliasContainer.classList.remove('hidden');
+                expirationContainer.classList.add('hidden');
+            }
+        });
 
         btn.addEventListener('click', async () => {
           const url = urlInput.value.trim();
           const apiKey = apiKeyInput.value.trim();
           const alias = aliasInput.value.trim();
+          const type = document.querySelector('input[name="demo-type"]:checked').value;
 
           if(!url){ out.textContent = '원본 URL을 입력하세요.'; return; }
           out.textContent = '요청 중...';
 
           const headers = { 'Content-Type': 'application/json' };
-          const requestBody = { url: url };
+          const requestBody = { url: url, type: type };
 
-          if (alias) { // 커스텀 코드 사용 시
+          if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+          }
+
+          if (type === 'r1') {
+            if (!apiKey) { out.textContent = 'R1 타입은 API Key가 필수입니다.'; return; }
+            if (!expirationInput.value) { out.textContent = 'R1 타입은 만료일이 필수입니다.'; return; }
+            requestBody.expiresAt = expirationInput.value;
+            requestBody.isUtc = document.getElementById('demo-utc-checkbox').checked;
+          } else if (alias) {
             if (!apiKey) {
               out.textContent = '커스텀 코드 사용 시 API Key는 필수입니다.';
               return;
             }
-            headers['Authorization'] = `Bearer ${apiKey}`;
             requestBody.alias = alias;
-          } else { // 무작위 코드 사용 시 (API Key는 있어도 무시됨)
-            // 비회원 요청이므로 Authorization 헤더를 보내지 않음
-            // 만약 API Key가 입력되어 있다면, 이는 무시됩니다.
           }
 
           try{
@@ -195,7 +301,12 @@ shortenAnonymous('https://example.com/another/long/path')
         });
 
         resetBtn.addEventListener('click', resetDemo);
-        resetDemo(); // 페이지 로드 시 초기화
+
+        // DOMContentLoaded 이후에 초기화 함수를 호출하여 auth.js가 먼저 실행되도록 보장
+        document.addEventListener('DOMContentLoaded', () => {
+          resetDemo();
+        });
+
       })();
     </script>
 

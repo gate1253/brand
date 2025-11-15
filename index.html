@@ -162,7 +162,11 @@
 		}
 
 		document.addEventListener('DOMContentLoaded', () => {
-			const user = window.user; // auth.js에서 설정한 사용자 정보
+			// 페이지 로드 시 localStorage에서 사용자 정보를 가져와 UI를 업데이트합니다.
+			const user = window.getCurrentUser();
+			window.user = user; // 다른 스크립트(app.js)에서 참조할 수 있도록 전역 변수에 할당
+			updateUIForUser(user);
+
 
 			// 모달 닫기 버튼 이벤트
 			document.getElementById('modal-close-btn').addEventListener('click', () => {
