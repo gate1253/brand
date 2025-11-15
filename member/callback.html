@@ -6,16 +6,21 @@
 <title>인증 중… · RES302</title>
 <link rel="stylesheet" href="/assets/style.css">
 <style>
-  .wrap{max-width:760px;margin:40px auto;padding:20px;background:#fff;border-radius:10px;text-align:center}
-  .btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer}
+  body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background-color:#f8f9fa}
+  .wrap{max-width:400px;width:100%;margin:20px;padding:40px;background:#fff;border-radius:10px;text-align:center;box-shadow:0 4px 6px rgba(0,0,0,.1)}
+  .loader{border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto 20px auto}
+  @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+  #status{font-size:1.1em;color:#555;margin-bottom:20px}
+  #home-btn-container{display:none} /* 기본적으로 숨김 */
 </style>
 </head>
 <body>
   <main class="wrap">
-    <h1>인증 처리 중입니다…</h1>
+    <div id="loader" class="loader"></div>
     <p id="status">잠시만 기다려 주세요.</p>
-    <div id="profile" style="display:none;margin-top:18px"></div>
-    <p style="margin-top:18px"><a href="/" class="btn">홈으로</a></p>
+    <div id="home-btn-container">
+      <a href="/" class="btn primary">홈으로</a>
+    </div>
   </main>
 
   <script src="/member/auth.js"></script>
@@ -23,6 +28,15 @@
     // callback 처리: auth.js에서 export한 handleCallback을 호출
     (async () => {
       const status = document.getElementById('status');
+      const loader = document.getElementById('loader');
+      const homeBtnContainer = document.getElementById('home-btn-container');
+
+      const showFailure = (message) => {
+        loader.style.display = 'none';
+        status.textContent = message;
+        homeBtnContainer.style.display = 'block';
+      };
+
       try{
         status.textContent = '인증 코드 교환 중...';
         const profile = await window.handleCallback(); // auth.js가 localStorage에 정보를 저장합니다.
@@ -30,11 +44,11 @@
           status.textContent = '인증이 완료되었습니다. 홈으로 이동합니다.';
           location.href = '/';
         }else{
-          status.textContent = '인증에 실패했습니다.';
+          showFailure('인증에 실패했습니다.');
         }
       }catch(err){
         console.error(err);
-        status.textContent = '인증 처리 중 오류가 발생했습니다.';
+        showFailure('인증 처리 중 오류가 발생했습니다.');
       }
     })();
   </script>
