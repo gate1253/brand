@@ -158,12 +158,17 @@ async function handleShorten(){
 				return;
 			}
 
+			// UTC 체크박스 상태에 따라 expiresAt 값을 UTC로 변환하고, isUtc 필드는 제거합니다.
 			const utcCheckbox = document.getElementById('utc-checkbox');
-			requestBody.expiresAt = expirationInput.value;
-			if (utcCheckbox) {
-				requestBody.isUtc = utcCheckbox.checked;
-			}
+			const localDate = new Date(expirationInput.value);
 
+			if (utcCheckbox && utcCheckbox.checked) {
+				// UTC 체크 시: 입력값을 UTC로 간주하고 ISO 문자열로 변환 (YYYY-MM-DDTHH:mm:ss.sssZ)
+				requestBody.expiresAt = new Date(localDate.getTime() - (localDate.getTimezoneOffset() * 60000)).toISOString();
+			} else {
+				// UTC 미체크 시: 입력값을 로컬 시간으로 간주하고 UTC로 변환
+				requestBody.expiresAt = localDate.toISOString();
+			}
 		} else {
 			const aliasInput = document.getElementById('alias-input');
 			if (aliasInput) {

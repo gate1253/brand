@@ -68,8 +68,7 @@
   -d '{
     "url":"https://example.com/secret-document",
     "type": "r1",
-    "expiresAt": "2025-01-01T00:00:00",
-    "isUtc": true
+    "expiresAt": "2025-01-01T00:00:00Z"
   }'
 </code></pre>
     <p>응답 예시 (R1 타입):</p>
@@ -149,8 +148,7 @@ async function shortenWithExpiration(originalUrl, expirationDateTime) {
   const body = { 
     url: originalUrl,
     type: 'r1',
-    expiresAt: expirationDateTime, // 예: "2025-12-31T23:59:59"
-    isUtc: true // 만료 시간이 UTC 기준인지 여부 (선택 사항, 기본값 false)
+    expiresAt: expirationDateTime // 예: "2025-01-01T00:00:00Z" (UTC 시간)
   };
 
   const res = await fetch(`${API_BASE}/api/shorten`, {
@@ -271,8 +269,16 @@ async function shortenForLargeFile(originalUrl) {
           if (type === 'r1') {
             if (!apiKey) { out.textContent = 'R1 타입은 API Key가 필수입니다.'; return; }
             if (!expirationInput.value) { out.textContent = 'R1 타입은 만료일이 필수입니다.'; return; }
-            requestBody.expiresAt = expirationInput.value;
-            requestBody.isUtc = document.getElementById('demo-utc-checkbox').checked;
+            
+            const utcCheckbox = document.getElementById('demo-utc-checkbox');
+            const localDate = new Date(expirationInput.value);
+            if (utcCheckbox && utcCheckbox.checked) {
+              // UTC 체크 시: 입력값을 UTC로 간주하고 ISO 문자열로 변환
+              requestBody.expiresAt = new Date(localDate.getTime() - (localDate.getTimezoneOffset() * 60000)).toISOString();
+            } else {
+              // UTC 미체크 시: 입력값을 로컬 시간으로 간주하고 UTC로 변환
+              requestBody.expiresAt = localDate.toISOString();
+            }
           } else if (alias) {
             if (!apiKey) {
               out.textContent = '커스텀 코드 사용 시 API Key는 필수입니다.';
