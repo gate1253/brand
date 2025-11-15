@@ -98,17 +98,9 @@
 	<script src="assets/script.js" defer></script>
 	<script>
 		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
-		document.addEventListener('DOMContentLoaded', () => {
+		// auth.js에서 사용자 정보를 로드한 후 이 함수를 호출합니다.
+		function updateUIForUser(user) {
 			const authContainer = document.getElementById('auth-container');
-			// const user = window.getCurrentUser(); // 원본 코드
-			// 로그인 후 화면을 확인하기 위한 임시 사용자 정보입니다. app.js에서 참조할 수 있도록 window 객체에 할당합니다.
-			// window.user = {
-			// 	name: 'Test User',
-			// 	picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c', // 프로필 이미지 예시
-			// 	apiKey: 'test-api-key-for-viewing-123',
-			// 	uniqueUserId: 'test-user-id-for-viewing-456'
-			// };
-			const user = window.user; // 로컬 변수에도 할당하여 아래 로직들이 정상 동작하도록 함
 			const r1Btn = document.getElementById('r1-btn');
 			const r2Btn = document.getElementById('r2-btn');
 			const r5Btn = document.getElementById('r5-btn');
@@ -118,6 +110,7 @@
 			const expirationInputContainer = document.getElementById('expiration-input-container');
 			const customCodeNote = document.getElementById('custom-code-note');
 			const leadText = document.getElementById('lead-text');
+			const logoImg = document.getElementById('logo-img');
 
 			if (user) {
 				r1Btn.classList.remove('hidden');
@@ -166,6 +159,10 @@
 				expirationInputContainer.classList.add('hidden');
 				customCodeNote.style.display = 'block';
 			}
+		}
+
+		document.addEventListener('DOMContentLoaded', () => {
+			const user = window.user; // auth.js에서 설정한 사용자 정보
 
 			// 모달 닫기 버튼 이벤트
 			document.getElementById('modal-close-btn').addEventListener('click', () => {
@@ -200,7 +197,6 @@
 
 			// 추가: R3/R2 토글 로직
 			const r3Btn = document.getElementById('r3-btn');
-			const logoImg = document.getElementById('logo-img');
 
 			r3Btn.addEventListener('click', (e) => {
 				e.preventDefault();
