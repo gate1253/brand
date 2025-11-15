@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
-	<title>RES302</title>
+	<title>GATE1253</title>
 	<link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
@@ -21,25 +21,37 @@
 		<div class="brand" role="banner">
 			<img id="logo-img" class="logo" src="assets/images/logo-r3.jpg" alt="R3">
 			<div class="service-toggle" style="margin-bottom: 16px; display: flex; gap: 8px;">
-				<a id="res302-btn" class="service-toggle-btn active" href="#" title="RES302" aria-label="RES302">RES302</a>
-				<a id="res200-btn" class="service-toggle-btn hidden" href="#" title="RES200" aria-label="RES200">RES200</a>
+				<a id="r1-btn" class="service-toggle-btn hidden" href="#" title="R1" aria-label="R1">R1</a>
+				<a id="r2-btn" class="service-toggle-btn hidden" href="#" title="R2" aria-label="R2">R2</a>
+				<a id="r5-btn" class="service-toggle-btn hidden" href="#" title="R5" aria-label="R5">R5</a>
+				<a id="r3-btn" class="service-toggle-btn active" href="#" title="R3" aria-label="R3">R3</a>
 			</div>
-			<p class="lead" style="margin-top:0">간단하고 빠른 단축 URL 생성 서비스</p>
+			<p id="lead-text" class="lead" style="margin-top:0">간단하고 빠른 단축 URL 생성 서비스</p>
 		</div>
 
 		<!-- 중앙 검색(단축) 박스 -->
 		<section aria-labelledby="shorten-heading">
 			<h2 id="shorten-heading" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">단축 URL 생성</h2>
-			<form class="search-box" onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
-				<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)" aria-label="원본 URL" />
-				<button id="shorten-btn" type="button">CREATE</button>
-			</form>
+			<!-- 입력 필드들을 감싸는 부모 컨테이너 추가 -->
+			<div id="search-wrap" class="search-wrap">
+				<form class="search-box" onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
+					<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)" aria-label="원본 URL" />
+					<button id="shorten-btn" type="button">CREATE</button>
+				</form>
+	
+				<!-- 추가: 로그인 시 커스텀 코드 입력 필드 -->
+				<div id="alias-input-container" class="search-box alias-box hidden">
+					<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드" style="flex:1;border:none;outline:none;padding:8px;background:transparent;">
+				</div>
 
-			<!-- 추가: 로그인 시 커스텀 코드 입력 필드 -->
-			<div id="alias-input-container" class="search-box alias-box hidden">
-				<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드" style="flex:1;border:none;outline:none;padding:8px;background:transparent;">
+				<!-- R1 전용: 만료일 설정 필드 -->
+				<div id="expiration-input-container" class="search-box alias-box hidden">
+					<input id="expiration-input" type="text" placeholder="만료일" aria-label="만료일" style="flex:1;border:none;outline:none;padding:8px;background:transparent;font-size:16px;color:#333;">
+					<label style="display:flex; align-items:center; gap:5px; font-size: 14px; color: #555; cursor: pointer; white-space: nowrap;">
+						<input type="checkbox" id="utc-checkbox"> UTC
+					</label>
+				</div>
 			</div>
-
 			<!-- 결과는 입력폼 영역이 대체하여 표시됩니다 (result-box 삭제) -->
 			<p id="custom-code-note" class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀 코드가 필요하면 회원으로 로그인하세요.</p>
 			<div id="msg" class="status" role="status" aria-live="polite" style="text-align:center"></div>
@@ -88,11 +100,29 @@
 		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
 		document.addEventListener('DOMContentLoaded', () => {
 			const authContainer = document.getElementById('auth-container');
-			const user = window.getCurrentUser();
-			const res200Btn = document.getElementById('res200-btn');
+			// const user = window.getCurrentUser(); // 원본 코드
+			// 로그인 후 화면을 확인하기 위한 임시 사용자 정보입니다. app.js에서 참조할 수 있도록 window 객체에 할당합니다.
+			// window.user = {
+			// 	name: 'Test User',
+			// 	picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c', // 프로필 이미지 예시
+			// 	apiKey: 'test-api-key-for-viewing-123',
+			// 	uniqueUserId: 'test-user-id-for-viewing-456'
+			// };
+			const user = window.user; // 로컬 변수에도 할당하여 아래 로직들이 정상 동작하도록 함
+			const r1Btn = document.getElementById('r1-btn');
+			const r2Btn = document.getElementById('r2-btn');
+			const r5Btn = document.getElementById('r5-btn');
+
+			// 로그인 상태에 따라 커스텀 입력 필드 표시/숨김
+			const aliasInputContainer = document.getElementById('alias-input-container');
+			const expirationInputContainer = document.getElementById('expiration-input-container');
+			const customCodeNote = document.getElementById('custom-code-note');
+			const leadText = document.getElementById('lead-text');
 
 			if (user) {
-				res200Btn.classList.remove('hidden');
+				r1Btn.classList.remove('hidden');
+				r2Btn.classList.remove('hidden');
+				r5Btn.classList.remove('hidden');
 				// 로그인된 경우: 프로필 사진과 로그아웃 버튼 표시
 				const userName = user.name || 'User profile';
 				authContainer.innerHTML = `
@@ -102,6 +132,16 @@
 				document.getElementById('logout-btn').addEventListener('click', () => {
 					window.logout();
 				});
+
+				// 로그인 시, 활성화된 버튼에 따라 적절한 입력창 표시
+				if (r1Btn.classList.contains('active')) {
+					expirationInputContainer.classList.remove('hidden');
+					aliasInputContainer.classList.add('hidden');
+				} else {
+					aliasInputContainer.classList.remove('hidden');
+					expirationInputContainer.classList.add('hidden');
+				}
+				customCodeNote.style.display = 'none';
 
 				// 프로필 사진 클릭 시 API 키 모달 열기
 				const profilePicture = document.getElementById('profile-picture');
@@ -121,6 +161,10 @@
 			} else {
 				// 로그아웃된 경우: 로그인 버튼 표시
 				authContainer.innerHTML = `<a class="auth-button" href="/member/login.html">Login</a>`;
+				// 로그아웃 시 커스텀 코드 입력창 숨김
+				aliasInputContainer.classList.add('hidden');
+				expirationInputContainer.classList.add('hidden');
+				customCodeNote.style.display = 'block';
 			}
 
 			// 모달 닫기 버튼 이벤트
@@ -154,106 +198,81 @@
 				}
 			});
 
-			// 추가: RES302/RES200 토글 로직
-			const res302Btn = document.getElementById('res302-btn');
+			// 추가: R3/R2 토글 로직
+			const r3Btn = document.getElementById('r3-btn');
 			const logoImg = document.getElementById('logo-img');
 
-			res302Btn.addEventListener('click', (e) => {
+			r3Btn.addEventListener('click', (e) => {
 				e.preventDefault();
-				if (!res302Btn.classList.contains('active')) {
-					res302Btn.classList.add('active');
-					res200Btn.classList.remove('active');
+				if (!r3Btn.classList.contains('active')) {
+					r3Btn.classList.add('active');
+					r1Btn.classList.remove('active');
+					r2Btn.classList.remove('active');
+					r5Btn.classList.remove('active');
 					logoImg.src = 'assets/images/logo-r3.jpg';
 					logoImg.alt = 'R3';
+					leadText.textContent = '간단하고 빠른 단축 URL 생성 서비스';
+					if (user) {
+						aliasInputContainer.classList.remove('hidden');
+						expirationInputContainer.classList.add('hidden');
+					}
 				}
 			});
 
-			res200Btn.addEventListener('click', (e) => {
+			// R1, R2, R5 버튼에 대한 공통 핸들러
+			r2Btn.addEventListener('click', (e) => {
 				e.preventDefault();
-				if (!res200Btn.classList.contains('active')) {
-					res200Btn.classList.add('active');
-					res302Btn.classList.remove('active');
+				if (!r2Btn.classList.contains('active')) {
+					r2Btn.classList.add('active');
+					r3Btn.classList.remove('active');
 					logoImg.src = 'assets/images/logo-r2.jpg';
 					logoImg.alt = 'R2';
+					// 다른 서비스 버튼 비활성화
+					r1Btn.classList.remove('active');
+					r5Btn.classList.remove('active');
+					leadText.textContent = '원본 URL 노출을 막아주는 안전한 단축 URL 서비스';
+					if (user) {
+						aliasInputContainer.classList.remove('hidden');
+						expirationInputContainer.classList.add('hidden');
+					}
 				}
 			});
 
-			// 추가: 단축 URL 생성 로직
-			const shortenBtn = document.getElementById('shorten-btn');
-			const urlInput = document.getElementById('url-input');
-			const aliasInput = document.getElementById('alias-input');
-			const aliasContainer = document.getElementById('alias-input-container');
-			const customCodeNote = document.getElementById('custom-code-note');
-			const msgDiv = document.getElementById('msg');
-			const searchBox = document.querySelector('.search-box');
-
-			// 로그인 상태에 따라 커스텀 입력 필드 표시
-			if (window.getCurrentUser()) {
-				aliasContainer.classList.remove('hidden');
-				customCodeNote.style.display = 'none';
-			}
-
-			shortenBtn.addEventListener('click', async () => {
-				const url = urlInput.value.trim();
-				if (!url) {
-					msgDiv.textContent = 'URL을 입력해주세요.';
-					return;
-				}
-
-				const alias = aliasInput.value.trim();
-				const user = window.getCurrentUser();
-
-				if (alias && !user) {
-					msgDiv.textContent = '커스텀 코드를 사용하려면 로그인이 필요합니다.';
-					return;
-				}
-
-				msgDiv.textContent = '생성 중...';
-				shortenBtn.disabled = true;
-
-				try {
-					const payload = { url };
-					if (alias) payload.alias = alias;
-
-					const headers = { 'Content-Type': 'application/json' };
-					if (user && user.apiKey) {
-						headers['Authorization'] = `Bearer ${user.apiKey}`;
+			r1Btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				if (!r1Btn.classList.contains('active')) {
+					r1Btn.classList.add('active');
+					r3Btn.classList.remove('active');
+					// NOTE: 'logo-r1.jpg' 파일을 assets/images/ 폴더에 추가해야 합니다.
+					logoImg.src = 'assets/images/logo-r1.jpg';
+					logoImg.alt = 'R1';
+					// 다른 서비스 버튼 비활성화
+					r2Btn.classList.remove('active');
+					r5Btn.classList.remove('active');
+					leadText.textContent = '간단하고 빠른 One Time URL 생성 서비스';
+					if (user) {
+						expirationInputContainer.classList.remove('hidden');
+						aliasInputContainer.classList.add('hidden');
 					}
+				}
+			});
 
-					const response = await fetch('/api/shorten', {
-						method: 'POST',
-						headers,
-						body: JSON.stringify(payload)
-					});
-
-					const data = await response.json();
-
-					if (!response.ok) {
-						throw new Error(data.error || '알 수 없는 오류가 발생했습니다.');
+			r5Btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				if (!r5Btn.classList.contains('active')) {
+					r5Btn.classList.add('active');
+					r3Btn.classList.remove('active');
+					// NOTE: 'logo-r5.jpg' 파일을 assets/images/ 폴더에 추가해야 합니다.
+					logoImg.src = 'assets/images/logo-r5.jpg';
+					logoImg.alt = 'R5';
+					// 다른 서비스 버튼 비활성화
+					r1Btn.classList.remove('active');
+					r2Btn.classList.remove('active');
+					leadText.textContent = '대용량 파일 서비스에 적합한 단축 URL 생성 서비스';
+					if (user) {
+						aliasInputContainer.classList.remove('hidden');
+						expirationInputContainer.classList.add('hidden');
 					}
-
-					const isRes200Mode = res200Btn.classList.contains('active');
-					const resultUrl = (isRes200Mode && data.shortUrl2) ? data.shortUrl2 : data.shortUrl;
-
-					searchBox.style.display = 'none';
-					aliasContainer.style.display = 'none';
-					
-					msgDiv.innerHTML = `
-						<div class="result-box" style="text-align:center;">
-							<p style="margin-bottom: 10px;">${data.message}</p>
-							<div style="display: inline-flex; align-items: center; gap: 8px; background: #fff; padding: 4px 12px; border-radius: 8px; border: 1px solid #e0e0e0;">
-								<a href="${resultUrl}" target="_blank" rel="noopener noreferrer">${resultUrl}</a>
-								<button class="btn primary small" onclick="navigator.clipboard.writeText('${resultUrl}').then(() => this.textContent='복사됨!')">복사</button>
-							</div>
-							<br>
-							<button class="btn secondary" style="margin-top: 15px;" onclick="window.location.reload()">새로 만들기</button>
-						</div>
-					`;
-
-				} catch (error) {
-					msgDiv.textContent = `오류: ${error.message}`;
-				} finally {
-					shortenBtn.disabled = false;
 				}
 			});
 
@@ -284,6 +303,19 @@
 				if (e.target === this) {
 					this.classList.add('hidden');
 					videoContainer.innerHTML = ''; // 비디오 정지
+				}
+			});
+
+			// 추가: R1 만료일 입력 필드 placeholder 처리
+			const expirationInput = document.getElementById('expiration-input');
+			expirationInput.addEventListener('focus', function() {
+				this.type = 'datetime-local';
+				this.placeholder = '';
+			});
+			expirationInput.addEventListener('blur', function() {
+				if (!this.value) {
+					this.type = 'text';
+					this.placeholder = '만료일';
 				}
 			});
 		});

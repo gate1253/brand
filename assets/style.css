@@ -50,11 +50,11 @@ body{
 }
 
 /* 검색창 스타일 (중앙 큰 박스) */
-.search-wrap{
+.search-wrap {
 	width:100%;
 	max-width:800px;
 	display:flex;
-	flex-direction:column;
+	flex-direction: column;
 	align-items:center;
 	gap:12px;
 }
@@ -485,27 +485,32 @@ body{
 	display: inline-flex;
 	align-items: center;
 	padding: 8px 12px;
-	border-radius: 999px;
+	border-radius: 20px; /* 더 부드러운 라운딩 */
 	background: #f8f9fa;
 	color: #5f6368;
 	border: 1px solid #dadce0;
 	text-decoration: none;
 	font-weight: 600;
-	font-size: 13px;
-	box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+	font-size: 14px; /* 가독성을 위해 폰트 크기 증가 */
+	box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 	cursor: pointer;
+	transition: all 0.2s ease-in-out; /* 부드러운 전환 효과 추가 */
 }
 .service-toggle-btn:hover,
 .service-toggle-btn:focus {
 	background: #e8eaed;
 	color: #202124;
 	outline: none;
-	box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	transform: scale(1.05); /* 호버 시 약간 확대되는 효과 */
 }
 .service-toggle-btn.active {
-	background: #e8f0fe;
-	color: #1967d2;
+	background: #1a73e8; /* 활성 상태 배경색 강조 */
+	color: #ffffff; /* 활성 상태 글자색 변경 */
 	font-weight: 600;
+	border-color: #1a73e8;
+	box-shadow: 0 1px 3px rgba(26, 115, 232, 0.2);
+	transform: scale(1.05);
 }
 /* 추가: 비디오 모달 관련 스타일 (선택자 수정) */
 #video-modal.modal-overlay {

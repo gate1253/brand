@@ -5,6 +5,8 @@ const msg = document.getElementById('msg');
 const searchBox = document.querySelector('.search-box');
 // 추가: 커스텀 코드 입력 필드 컨테이너 및 안내 메시지
 const aliasInputContainer = document.getElementById('alias-input-container');
+// R1용 만료일 컨테이너
+const expirationInputContainer = document.getElementById('expiration-input-container');
 const customCodeNote = document.getElementById('custom-code-note');
 
 // 렌더: 입력 폼 (input + 단축 버튼)
@@ -17,14 +19,24 @@ function renderForm() {
 	document.getElementById('shorten-btn').addEventListener('click', handleShorten);
 	document.getElementById('url-input').focus();
 
-	// 추가: 로그인 상태에 따라 커스텀 코드 입력 필드와 안내 메시지 표시/숨김
-	const user = window.getCurrentUser();
+	// 추가: "새로 만들기" 시 로그인 상태를 다시 확인하여 커스텀 코드 입력창을 복원합니다.
+	// 테스트용 window.user가 있으면 그것을 사용하고, 없으면 실제 로그인 함수를 호출합니다.
+	const user = window.user || (window.getCurrentUser ? window.getCurrentUser() : null);
+	const isR1Active = document.getElementById('r1-btn')?.classList.contains('active');
+
 	if (user) {
-		aliasInputContainer.classList.remove('hidden');
-		customCodeNote.classList.add('hidden'); // 로그인 시 안내 메시지 숨김
+		if (isR1Active) {
+			expirationInputContainer.classList.remove('hidden');
+			aliasInputContainer.classList.add('hidden');
+		} else {
+			aliasInputContainer.classList.remove('hidden');
+			expirationInputContainer.classList.add('hidden');
+		}
+		customCodeNote.style.display = 'none';
 	} else {
 		aliasInputContainer.classList.add('hidden');
-		customCodeNote.classList.remove('hidden'); // 로그아웃 시 안내 메시지 표시
+		expirationInputContainer.classList.add('hidden');
+		customCodeNote.style.display = 'block';
 	}
 }
 
@@ -32,6 +44,7 @@ function renderForm() {
 function renderResult(shortUrl){
 	// 추가: 결과 표시 시 커스텀 코드 입력 필드와 안내 메시지 숨김
 	aliasInputContainer.classList.add('hidden');
+	expirationInputContainer.classList.add('hidden');
 	customCodeNote.classList.add('hidden');
 
 	searchBox.innerHTML = `
@@ -122,16 +135,42 @@ async function handleShorten(){
 	msg.textContent = '요청 중...';
 
 	let alias = null;
-	const user = window.getCurrentUser();
-	let requestBody = { url }; // 기본 요청 본문
+	// 테스트용 window.user가 있으면 그것을 사용하고, 없으면 실제 로그인 함수를 호출합니다.
+	const user = window.user || (window.getCurrentUser ? window.getCurrentUser() : null);
+	
+	// 활성화된 서비스 타입을 찾아서 요청 본문에 추가합니다.
+	const serviceButtons = document.querySelectorAll('.service-toggle-btn');
+	let serviceType = 'r3'; // 기본값
+	for (const btn of serviceButtons) {
+		if (btn.classList.contains('active')) {
+			serviceType = btn.id.replace('-btn', ''); // 'r1-btn' -> 'r1'
+			break;
+		}
+	}
 
+	let requestBody = { url, type: serviceType }; // 기본 요청 본문
+	
 	if (user) {
-		const aliasInput = document.getElementById('alias-input');
-		if (aliasInput) {
-			alias = aliasInput.value.trim();
-			if (alias) {
-				requestBody.alias = alias;
-				// 변경: uniqueUserId를 요청 본문에 포함시키지 않음. Worker에서 API 키로 검증.
+		if (serviceType === 'r1') {
+			const expirationInput = document.getElementById('expiration-input');
+			if (!expirationInput || !expirationInput.value) {
+				msg.textContent = '만료일을 선택하세요.';
+				return;
+			}
+
+			const utcCheckbox = document.getElementById('utc-checkbox');
+			requestBody.expiresAt = expirationInput.value;
+			if (utcCheckbox) {
+				requestBody.isUtc = utcCheckbox.checked;
+			}
+
+		} else {
+			const aliasInput = document.getElementById('alias-input');
+			if (aliasInput) {
+				alias = aliasInput.value.trim();
+				if (alias) {
+					requestBody.alias = alias;
+				}
 			}
 		}
 	}

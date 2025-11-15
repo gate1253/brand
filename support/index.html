@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>RES302 · Support / API 사용 예제</title>
+<title>GATE1253 · Support / API 사용 예제</title>
 <link rel="stylesheet" href="/assets/style.css">
 <style>
   body{font-family:Inter, Roboto, Arial, sans-serif;background:#f5f7fb;color:#222;margin:0;padding:24px}
@@ -124,6 +124,7 @@ shortenAnonymous('https://example.com/another/long/path')
       <div id="demo-result" class="demo-result" role="status"></div>
     </div>
 
+    <script src="/member/auth.js" defer></script>
     <script>
       (function(){
         const API_BASE = 'https://api.gate1253.workers.dev';
@@ -140,6 +141,15 @@ shortenAnonymous('https://example.com/another/long/path')
           aliasInput.value = '';
           out.textContent = '';
           urlInput.focus();
+
+          // 로그인 상태 확인 후 API 키 자동 채우기
+          // DOMContentLoaded를 기다릴 필요 없이, auth.js 로드 후 실행되도록 함
+          document.addEventListener('DOMContentLoaded', () => {
+            const user = window.user || (window.getCurrentUser ? window.getCurrentUser() : null);
+            if (user && user.apiKey) {
+              apiKeyInput.value = user.apiKey;
+            }
+          });
         }
 
         btn.addEventListener('click', async () => {
