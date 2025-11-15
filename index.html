@@ -344,6 +344,22 @@
 					this.placeholder = '만료일';
 				}
 			});
+
+			// 추가: R1 만료일이 변경될 때 UTC 변환 처리
+			expirationInput.addEventListener('change', function() {
+				const utcCheckbox = document.getElementById('utc-checkbox');
+				if (this.value && !utcCheckbox.checked) {
+					// 체크박스가 선택되지 않았고 값이 있으면, 입력된 로컬 시간을 UTC로 변환
+					const localDate = new Date(this.value);
+					// toISOString()은 항상 UTC 기준 ISO 8601 형식(YYYY-MM-DDTHH:mm:ss.sssZ)을 반환합니다.
+					const utcString = localDate.toISOString();
+					// app.js에서 이 값을 사용하도록 data-* 속성에 저장합니다.
+					this.dataset.utcValue = utcString;
+				} else {
+					// 값이 없거나 UTC가 이미 체크된 경우, data-* 속성을 비웁니다.
+					delete this.dataset.utcValue;
+				}
+			});
 		});
 	</script>
  </body>
