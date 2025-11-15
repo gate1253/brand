@@ -100,17 +100,15 @@
 		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
 		// auth.js에서 사용자 정보를 로드한 후 이 함수를 호출합니다.
 		function updateUIForUser(user) {
-			const authContainer = document.getElementById('auth-container');
-			const r1Btn = document.getElementById('r1-btn');
-			const r2Btn = document.getElementById('r2-btn');
-			const r5Btn = document.getElementById('r5-btn');
+			const authContainer = document.getElementById('auth-container'); // 이 함수 내에서만 사용
+			const r1Btn = document.getElementById('r1-btn'); // 아래 DOMContentLoaded에서 다시 선언됨
+			const r2Btn = document.getElementById('r2-btn'); // 아래 DOMContentLoaded에서 다시 선언됨
+			const r5Btn = document.getElementById('r5-btn'); // 아래 DOMContentLoaded에서 다시 선언됨
 
 			// 로그인 상태에 따라 커스텀 입력 필드 표시/숨김
 			const aliasInputContainer = document.getElementById('alias-input-container');
 			const expirationInputContainer = document.getElementById('expiration-input-container');
 			const customCodeNote = document.getElementById('custom-code-note');
-			const leadText = document.getElementById('lead-text');
-			const logoImg = document.getElementById('logo-img');
 
 			if (user) {
 				r1Btn.classList.remove('hidden');
@@ -162,9 +160,32 @@
 		}
 
 		document.addEventListener('DOMContentLoaded', () => {
-			// 페이지 로드 시 localStorage에서 사용자 정보를 가져와 UI를 업데이트합니다.
-			const user = window.getCurrentUser();
-			window.user = user; // 다른 스크립트(app.js)에서 참조할 수 있도록 전역 변수에 할당
+			// 모든 버튼과 UI 요소를 여기서 한 번만 선언합니다.
+			const r1Btn = document.getElementById('r1-btn');
+			const r2Btn = document.getElementById('r2-btn');
+			const r3Btn = document.getElementById('r3-btn');
+			const r5Btn = document.getElementById('r5-btn');
+			const aliasInputContainer = document.getElementById('alias-input-container');
+			const expirationInputContainer = document.getElementById('expiration-input-container');
+			const logoImg = document.getElementById('logo-img');
+			const leadText = document.getElementById('lead-text');
+			const urlParams = new URLSearchParams(window.location.search);
+			let user;
+
+			if (urlParams.get('testuser') === '1') {
+				// 테스트용 임시 사용자 정보 (URL에 ?testuser=1 추가 시 활성화)
+				user = {
+					name: 'Test User',
+					picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
+					apiKey: 'test-api-key-for-viewing-123',
+					uniqueUserId: 'test-user-id-for-viewing-456'
+				};
+			} else {
+				// 페이지 로드 시 localStorage에서 실제 사용자 정보를 가져옵니다.
+				user = window.getCurrentUser();
+			}
+
+			window.user = user; // 다른 스크립트(app.js 등)에서 참조할 수 있도록 전역 변수에 할당
 			updateUIForUser(user);
 
 
@@ -199,16 +220,13 @@
 				}
 			});
 
-			// 추가: R3/R2 토글 로직
-			const r3Btn = document.getElementById('r3-btn');
-
+			// R3 버튼 클릭 핸들러
 			r3Btn.addEventListener('click', (e) => {
 				e.preventDefault();
 				if (!r3Btn.classList.contains('active')) {
+					// 모든 버튼 비활성화 후 현재 버튼만 활성화
+					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
 					r3Btn.classList.add('active');
-					r1Btn.classList.remove('active');
-					r2Btn.classList.remove('active');
-					r5Btn.classList.remove('active');
 					logoImg.src = 'assets/images/logo-r3.jpg';
 					logoImg.alt = 'R3';
 					leadText.textContent = '간단하고 빠른 단축 URL 생성 서비스';
@@ -219,17 +237,16 @@
 				}
 			});
 
-			// R1, R2, R5 버튼에 대한 공통 핸들러
+			// R2 버튼 클릭 핸들러
 			r2Btn.addEventListener('click', (e) => {
 				e.preventDefault();
 				if (!r2Btn.classList.contains('active')) {
+					// 모든 버튼 비활성화 후 현재 버튼만 활성화
+					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
 					r2Btn.classList.add('active');
-					r3Btn.classList.remove('active');
+
 					logoImg.src = 'assets/images/logo-r2.jpg';
 					logoImg.alt = 'R2';
-					// 다른 서비스 버튼 비활성화
-					r1Btn.classList.remove('active');
-					r5Btn.classList.remove('active');
 					leadText.textContent = '원본 URL 노출을 막아주는 안전한 단축 URL 서비스';
 					if (user) {
 						aliasInputContainer.classList.remove('hidden');
@@ -238,17 +255,17 @@
 				}
 			});
 
+			// R1 버튼 클릭 핸들러
 			r1Btn.addEventListener('click', (e) => {
 				e.preventDefault();
 				if (!r1Btn.classList.contains('active')) {
+					// 모든 버튼 비활성화 후 현재 버튼만 활성화
+					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
 					r1Btn.classList.add('active');
-					r3Btn.classList.remove('active');
+
 					// NOTE: 'logo-r1.jpg' 파일을 assets/images/ 폴더에 추가해야 합니다.
 					logoImg.src = 'assets/images/logo-r1.jpg';
 					logoImg.alt = 'R1';
-					// 다른 서비스 버튼 비활성화
-					r2Btn.classList.remove('active');
-					r5Btn.classList.remove('active');
 					leadText.textContent = '간단하고 빠른 One Time URL 생성 서비스';
 					if (user) {
 						expirationInputContainer.classList.remove('hidden');
@@ -257,17 +274,17 @@
 				}
 			});
 
+			// R5 버튼 클릭 핸들러
 			r5Btn.addEventListener('click', (e) => {
 				e.preventDefault();
 				if (!r5Btn.classList.contains('active')) {
+					// 모든 버튼 비활성화 후 현재 버튼만 활성화
+					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
 					r5Btn.classList.add('active');
-					r3Btn.classList.remove('active');
+
 					// NOTE: 'logo-r5.jpg' 파일을 assets/images/ 폴더에 추가해야 합니다.
 					logoImg.src = 'assets/images/logo-r5.jpg';
 					logoImg.alt = 'R5';
-					// 다른 서비스 버튼 비활성화
-					r1Btn.classList.remove('active');
-					r2Btn.classList.remove('active');
 					leadText.textContent = '대용량 파일 서비스에 적합한 단축 URL 생성 서비스';
 					if (user) {
 						aliasInputContainer.classList.remove('hidden');
