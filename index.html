@@ -298,18 +298,27 @@
 			const videoModal = document.getElementById('video-modal');
 			const closeVideoModal = document.getElementById('close-video-modal');
 			const videoContainer = document.getElementById('video-container');
-
-			introLink.addEventListener('click', function(event) {
-				event.preventDefault();
-				const videoUrl = this.getAttribute('href');
+			
+			function openIntroVideo() {
+				const videoUrl = introLink.getAttribute('href');
 				videoContainer.innerHTML = `
-					<video style="display: block; width: 100%; height: 100%;" controls autoplay playsinline>
+					<video style="display: block; width: 100%; height: 100%;" controls autoplay playsinline muted>
 						<source src="${videoUrl}" type="video/mp4">
 						죄송합니다. 비디오를 재생할 수 없습니다.
 					</video>
 				`;
 				videoModal.classList.remove('hidden');
+			}
+
+			introLink.addEventListener('click', function(event) {
+				event.preventDefault();
+				openIntroVideo();
 			});
+
+			if (!localStorage.getItem('hasSeenIntro')) {
+				openIntroVideo();
+				localStorage.setItem('hasSeenIntro', 'true');
+			}
 
 			closeVideoModal.addEventListener('click', function() {
 				videoModal.classList.add('hidden');
