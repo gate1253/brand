@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>Webpack App</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script defer src="malgnPlayer.js"></script>
+    <script defer src="/malgnPlayer.js"></script>
     <script>
       let _player;
       window.onload = function () {
@@ -14,38 +14,7 @@
             primaryKey: "33333",
             title: "test",
             thumbnail: "https://timgs.acs.wecandeo.com/thumb/513/20150724/17/2257_6c4bd_00000.jpg?udate=2025053002?udate=20220406",
-            // 단일 파일 설정 ( HLS & MPD 는 파일내 화질 정보를 사용합니다. )
             source: "https://api.wecandeo.com/video/default/BOKNS9AQWrG3T1ii8jW3SOJHk4DFRfnICIii8SOulPCMvomANL8sPkaIMOwkBTzaHclvYrRQhTSld1kWPMNtvis8Aieie.mp4"
-            // 화질 정보 설정 ( ex: mp4 )
-            // sources: [
-            //   {
-            //     isDefault: "false",
-            //     format: "mp4",
-            //     label: "360p",
-            //     url: "https://api.wecandeo.com/video/default/BOKNS9AQWrG3T1ii8jW3SOJHk4DFRfnICIii8SOulPCMvomANL8sPkaIMOwkBTzaHc3dpWLpisOU7MdNiiCI2AEipGwieie.mp4"
-            //   },
-            //   {
-            //     isDefault: "false",
-            //     format: "mp4",
-            //     label: "540p",
-            //     url: "https://api.wecandeo.com/video/default/BOKNS9AQWrG3T1ii8jW3SOJHk4DFRfnICIii8SOulPCMvomANL8sPkaIMOwkBTzaHclvYrRQhTSld1kWPMNtvis8Aieie.mp4"
-            //   }
-            // ],
-            // 자막 설정
-            // caption: [
-            //   {
-            //     code: "ko",
-            //     label: "한국어",
-            //     url: "https://service.domain.com/subtitle/20240919/V2356_d5187318-5745-4aa8-a853-ee9c1d6e89c2.smi",
-            //     format: "SMI"
-            //   },
-            //   {
-            //     code: "en",
-            //     label: "English",
-            //     url: "https://service.domain.com/subtitle/20240913/V2356_62c2830e-2bd7-4f68-8c21-3234661700a1.vtt",
-            //     format: "VTT"
-            //   }
-            // ]
           }
         });
       }
