@@ -9920,6 +9920,7 @@
             t = null
         },
         removePlayer: function(e) {
+            console.log("removePlayer", e)
             if ("string" == typeof e)
                 for (var t in malgnPlayer.players)
                     malgnPlayer.players[t].getPlayerID() == e && (malgnPlayer.players[t].remove(),
