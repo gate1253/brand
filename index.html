@@ -4,6 +4,22 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>GATE1253</title>
+	<style>
+		/* 추가: 로딩 스피너 스타일 */
+		.loader {
+			border: 2px solid #f3f3f3; /* Light grey */
+			border-top: 2px solid #3498db; /* Blue */
+			border-radius: 50%;
+			width: 16px;
+			height: 16px;
+			animation: spin 1s linear infinite;
+		}
+
+		@keyframes spin {
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
+		}
+	</style>
 	<link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
@@ -36,7 +52,10 @@
 			<div id="search-wrap" class="search-wrap">
 				<form class="search-box" onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
 					<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)" aria-label="원본 URL" />
-					<button id="shorten-btn" type="button">CREATE</button>
+					<button id="shorten-btn" type="button">
+						<span class="button-text">CREATE</span>
+						<div class="loader hidden"></div>
+					</button>
 				</form>
 	
 				<!-- 추가: 로그인 시 커스텀 코드 입력 필드 -->
