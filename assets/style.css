@@ -240,13 +240,19 @@ body {
 	}
 }
 
-/* 상단 우측 고정 Presentation 링크 */
-.top-right-doc {
+/* 추가: 좌측 상단 네비게이션 컨테이너 */
+.top-left-nav {
 	position: fixed;
 	top: 16px;
-	left: 80px;
-	/* Intro 링크 옆으로 이동 (약 8px 간격) */
+	left: 16px;
 	z-index: 1000;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+/* 상단 우측 고정 Presentation 링크 */
+.top-right-doc {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
@@ -278,11 +284,6 @@ body {
 
 /* 추가: 우측 상단 고정 Intro 링크 */
 .top-right-intro {
-	position: fixed;
-	top: 16px;
-	left: 16px;
-	/* 왼쪽 상단으로 이동 */
-	z-index: 1000;
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
@@ -314,11 +315,6 @@ body {
 
 /* 추가: 우측 상단 Info 버튼 스타일 (실제로는 좌측 상단) */
 .top-right-info-btn {
-	position: fixed;
-	top: 16px;
-	left: 175px;
-	/* Presentation 링크 옆에 배치 */
-	z-index: 1000;
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
@@ -345,10 +341,10 @@ body {
 }
 
 @media (max-width: 560px) {
-	.top-right-info-btn {
+	.top-left-nav {
+		flex-direction: column;
+		align-items: flex-start;
 		top: 60px;
-		/* 모바일에서 겹치지 않게 조절 */
-		left: 16px;
 	}
 }
 

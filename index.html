@@ -34,13 +34,16 @@
 <body>
 	<!-- 추가: 우측 상단 고정 Support 링크 -->
 	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
-	<!-- 추가: 우측 상단 Intro MP4 링크 -->
-	<a class="top-right-intro" href="/support/intro.mp4" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
-	<!-- 추가: 우측 상단 presentation.pdf 링크 -->
-	<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer"
-		title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
-	<!-- 추가: 좌측 상단 Info 버튼 -->
-	<button id="info-btn" class="top-right-info-btn hidden" title="설명 정보 열기" aria-label="설명 정보">Info</button>
+	<!-- 추가: 좌측 상단 네비게이션 컨테이너 -->
+	<div class="top-left-nav">
+		<!-- 추가: 우측 상단 Intro MP4 링크 -->
+		<a class="top-right-intro" href="/support/intro.mp4" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
+		<!-- 추가: 우측 상단 presentation.pdf 링크 -->
+		<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer"
+			title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
+		<!-- 추가: 좌측 상단 Info 버튼 -->
+		<button id="info-btn" class="top-right-info-btn hidden" title="설명 정보 열기" aria-label="설명 정보">Info</button>
+	</div>
 	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
 	<div id="auth-container" class="auth-widget"></div>
 
