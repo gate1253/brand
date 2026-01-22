@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ko">
+
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -7,8 +8,10 @@
 	<style>
 		/* 추가: 로딩 스피너 스타일 */
 		.loader {
-			border: 2px solid #f3f3f3; /* Light grey */
-			border-top: 2px solid #3498db; /* Blue */
+			border: 2px solid #f3f3f3;
+			/* Light grey */
+			border-top: 2px solid #3498db;
+			/* Blue */
 			border-radius: 50%;
 			width: 16px;
 			height: 16px;
@@ -16,19 +19,28 @@
 		}
 
 		@keyframes spin {
-			0% { transform: rotate(0deg); }
-			100% { transform: rotate(360deg); }
+			0% {
+				transform: rotate(0deg);
+			}
+
+			100% {
+				transform: rotate(360deg);
+			}
 		}
 	</style>
 	<link rel="stylesheet" href="assets/style.css" />
 </head>
+
 <body>
 	<!-- 추가: 우측 상단 고정 Support 링크 -->
 	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
 	<!-- 추가: 우측 상단 Intro MP4 링크 -->
 	<a class="top-right-intro" href="/support/intro.mp4" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
 	<!-- 추가: 우측 상단 presentation.pdf 링크 -->
-	<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer" title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
+	<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer"
+		title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
+	<!-- 추가: 좌측 상단 Info 버튼 -->
+	<button id="info-btn" class="top-right-info-btn hidden" title="설명 정보 열기" aria-label="설명 정보">Info</button>
 	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
 	<div id="auth-container" class="auth-widget"></div>
 
@@ -47,32 +59,39 @@
 
 		<!-- 중앙 검색(단축) 박스 -->
 		<section aria-labelledby="shorten-heading">
-			<h2 id="shorten-heading" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">단축 URL 생성</h2>
+			<h2 id="shorten-heading"
+				style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">단축 URL 생성</h2>
 			<!-- 입력 필드들을 감싸는 부모 컨테이너 추가 -->
 			<div id="search-wrap" class="search-wrap">
-				<form class="search-box" onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
-					<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)" aria-label="원본 URL" />
+				<form class="search-box"
+					onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
+					<input id="url-input" type="url" placeholder="원본 URL을 입력하세요 (예: https://example.com)"
+						aria-label="원본 URL" />
 					<button id="shorten-btn" type="button">
 						<span class="button-text">CREATE</span>
 						<div class="loader hidden"></div>
 					</button>
 				</form>
-	
+
 				<!-- 추가: 로그인 시 커스텀 코드 입력 필드 -->
 				<div id="alias-input-container" class="search-box alias-box hidden">
-					<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드" style="flex:1;border:none;outline:none;padding:8px;background:transparent;">
+					<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드"
+						style="flex:1;border:none;outline:none;padding:8px;background:transparent;">
 				</div>
 
 				<!-- R1 전용: 만료일 설정 필드 -->
 				<div id="expiration-input-container" class="search-box alias-box hidden">
-					<input id="expiration-input" type="text" placeholder="만료일" aria-label="만료일" style="flex:1;border:none;outline:none;padding:8px;background:transparent;font-size:16px;color:#333;">
-					<label style="display:flex; align-items:center; gap:5px; font-size: 14px; color: #555; cursor: pointer; white-space: nowrap;">
+					<input id="expiration-input" type="text" placeholder="만료일" aria-label="만료일"
+						style="flex:1;border:none;outline:none;padding:8px;background:transparent;font-size:16px;color:#333;">
+					<label
+						style="display:flex; align-items:center; gap:5px; font-size: 14px; color: #555; cursor: pointer; white-space: nowrap;">
 						<input type="checkbox" id="utc-checkbox"> UTC
 					</label>
 				</div>
 			</div>
 			<!-- 결과는 입력폼 영역이 대체하여 표시됩니다 (result-box 삭제) -->
-			<p id="custom-code-note" class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀 코드가 필요하면 회원으로 로그인하세요.</p>
+			<p id="custom-code-note" class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀
+				코드가 필요하면 회원으로 로그인하세요.</p>
 			<div id="msg" class="status" role="status" aria-live="polite" style="text-align:center"></div>
 		</section>
 	</main>
@@ -99,8 +118,19 @@
 					<button id="copy-user-id-btn" class="btn primary small">COPY</button>
 				</div>
 			</div>
-			
+
 			<p class="modal-message" id="modal-message"></p>
+		</div>
+	</div>
+
+	<!-- 추가: R1/R2 설명 모달 -->
+	<div id="info-modal" class="modal-overlay hidden">
+		<div class="modal-content">
+			<button class="modal-close-btn" id="info-modal-close-btn">&times;</button>
+			<h2 id="info-modal-title">Service Info</h2>
+			<div id="info-modal-body" class="info-content">
+				<!-- 동적으로 내용이 채워집니다 -->
+			</div>
 		</div>
 	</div>
 
@@ -151,6 +181,7 @@
 					aliasInputContainer.classList.remove('hidden');
 					expirationInputContainer.classList.add('hidden');
 				}
+				updateInfoBtnVisibility();
 				customCodeNote.style.display = 'none';
 
 				// 프로필 사진 클릭 시 API 키 모달 열기
@@ -161,7 +192,7 @@
 						const displayApiKey = document.getElementById('display-api-key');
 						const displayUniqueUserId = document.getElementById('display-unique-user-id'); // 추가
 						const modalMessage = document.getElementById('modal-message');
-						
+
 						displayApiKey.textContent = user.apiKey;
 						displayUniqueUserId.textContent = user.uniqueUserId; // 추가
 						modalMessage.textContent = ''; // 이전 메시지 초기화
@@ -174,6 +205,7 @@
 				// 로그아웃 시 커스텀 코드 입력창 숨김
 				aliasInputContainer.classList.add('hidden');
 				expirationInputContainer.classList.add('hidden');
+				updateInfoBtnVisibility();
 				customCodeNote.style.display = 'block';
 			}
 		}
@@ -290,6 +322,7 @@
 						expirationInputContainer.classList.remove('hidden');
 						aliasInputContainer.classList.add('hidden');
 					}
+					updateInfoBtnVisibility();
 				}
 			});
 
@@ -317,7 +350,7 @@
 			const videoModal = document.getElementById('video-modal');
 			const closeVideoModal = document.getElementById('close-video-modal');
 			const videoContainer = document.getElementById('video-container');
-			
+
 			function openIntroVideo() {
 				const videoUrl = introLink.getAttribute('href');
 				videoContainer.innerHTML = `
@@ -329,7 +362,7 @@
 				videoModal.classList.remove('hidden');
 			}
 
-			introLink.addEventListener('click', function(event) {
+			introLink.addEventListener('click', function (event) {
 				event.preventDefault();
 				openIntroVideo();
 			});
@@ -339,12 +372,12 @@
 				localStorage.setItem('hasSeenIntro', 'true');
 			}
 
-			closeVideoModal.addEventListener('click', function() {
+			closeVideoModal.addEventListener('click', function () {
 				videoModal.classList.add('hidden');
 				videoContainer.innerHTML = ''; // 비디오 정지
 			});
 
-			videoModal.addEventListener('click', function(e) {
+			videoModal.addEventListener('click', function (e) {
 				if (e.target === this) {
 					this.classList.add('hidden');
 					videoContainer.innerHTML = ''; // 비디오 정지
@@ -353,17 +386,62 @@
 
 			// 추가: R1 만료일 입력 필드 placeholder 처리
 			const expirationInput = document.getElementById('expiration-input');
-			expirationInput.addEventListener('focus', function() {
+			expirationInput.addEventListener('focus', function () {
 				this.type = 'datetime-local';
 				this.placeholder = '';
 			});
-			expirationInput.addEventListener('blur', function() {
+			expirationInput.addEventListener('blur', function () {
 				if (!this.value) {
 					this.type = 'text';
 					this.placeholder = '만료일';
 				}
 			});
+
+			// 추가: Info 버튼 로직
+			const infoBtn = document.getElementById('info-btn');
+			const infoModal = document.getElementById('info-modal');
+			const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
+			const infoModalTitle = document.getElementById('info-modal-title');
+			const infoModalBody = document.getElementById('info-modal-body');
+
+			function updateInfoBtnVisibility() {
+				const user = window.user || window.getCurrentUser();
+				if (user && (r1Btn.classList.contains('active') || r2Btn.classList.contains('active'))) {
+					infoBtn.classList.remove('hidden');
+				} else {
+					infoBtn.classList.add('hidden');
+				}
+			}
+
+			infoBtn.addEventListener('click', () => {
+				if (r1Btn.classList.contains('active')) {
+					infoModalTitle.textContent = "R1 Service Description";
+					infoModalBody.innerHTML = `
+						<table class="info-table">
+							<tr><th>항목</th><th>설명</th></tr>
+							<tr><td><strong>404 대체 이미지</strong></td><td><code>404={http image address}</code></td></tr>
+							<tr><td colspan="2" class="hint">* 만료 후에는 해당 이미지로 대체 됩니다.</td></tr>
+						</table>`;
+				} else if (r2Btn.classList.contains('active')) {
+					infoModalTitle.textContent = "R2 Service Description";
+					infoModalBody.innerHTML = `
+						<table class="info-table">
+							<tr><th>항목</th><th>파라미터 (Query String)</th><th>서버 주소</th></tr>
+							<tr><td><strong>채팅</strong></td><td><code>with=websocket & type=html</code></td><td>'wss://chat.gate1253.kro.kr'</td></tr>
+							<tr><td><strong>화상채팅</strong></td><td><code>with=webrtc & type=html</code></td><td>'wss://chat.gate1253.kro.kr' 또는 <br>'https://webrtc.gate1253.workers.dev'</td></tr>
+							<tr><td><strong>플레이어</strong></td><td><code>with=player & type=html</code></td><td>'{MP4|M3U8}' 파일 주소</td></tr>
+						</table>`;
+				}
+				infoModal.classList.remove('hidden');
+			});
+
+			infoModalCloseBtn.addEventListener('click', () => infoModal.classList.add('hidden'));
+			infoModal.addEventListener('click', (e) => { if (e.target === infoModal) infoModal.classList.add('hidden'); });
+
+			// 초기화 시 가시성 체크
+			updateInfoBtnVisibility();
 		});
 	</script>
- </body>
- </html>
+</body>
+
+</html>
