@@ -147,14 +147,12 @@
 	<script src="assets/script.js" defer></script>
 	<script>
 		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
-		// auth.js에서 사용자 정보를 로드한 후 이 함수를 호출합니다.
 		function updateUIForUser(user) {
-			const authContainer = document.getElementById('auth-container'); // 이 함수 내에서만 사용
-			const r1Btn = document.getElementById('r1-btn'); // 아래 DOMContentLoaded에서 다시 선언됨
-			const r2Btn = document.getElementById('r2-btn'); // 아래 DOMContentLoaded에서 다시 선언됨
-			const r5Btn = document.getElementById('r5-btn'); // 아래 DOMContentLoaded에서 다시 선언됨
+			const authContainer = document.getElementById('auth-container');
+			const r1Btn = document.getElementById('r1-btn');
+			const r2Btn = document.getElementById('r2-btn');
+			const r5Btn = document.getElementById('r5-btn');
 
-			// 로그인 상태에 따라 커스텀 입력 필드 표시/숨김
 			const aliasInputContainer = document.getElementById('alias-input-container');
 			const expirationInputContainer = document.getElementById('expiration-input-container');
 			const customCodeNote = document.getElementById('custom-code-note');
@@ -163,7 +161,6 @@
 				r1Btn.classList.remove('hidden');
 				r2Btn.classList.remove('hidden');
 				r5Btn.classList.remove('hidden');
-				// 로그인된 경우: 프로필 사진과 로그아웃 버튼 표시
 				const userName = user.name || 'User profile';
 				authContainer.innerHTML = `
 					${user.picture ? `<img src="${user.picture}" alt="${userName}" class="profile-picture clickable" id="profile-picture">` : ''}
@@ -173,7 +170,6 @@
 					window.logout();
 				});
 
-				// 로그인 시, 활성화된 버튼에 따라 적절한 입력창 표시
 				if (r1Btn.classList.contains('active')) {
 					expirationInputContainer.classList.remove('hidden');
 					aliasInputContainer.classList.add('hidden');
@@ -184,25 +180,22 @@
 				updateInfoBtnVisibility();
 				customCodeNote.style.display = 'none';
 
-				// 프로필 사진 클릭 시 API 키 모달 열기
 				const profilePicture = document.getElementById('profile-picture');
 				if (profilePicture) {
 					profilePicture.addEventListener('click', () => {
 						const apiKeyModal = document.getElementById('api-key-modal');
 						const displayApiKey = document.getElementById('display-api-key');
-						const displayUniqueUserId = document.getElementById('display-unique-user-id'); // 추가
+						const displayUniqueUserId = document.getElementById('display-unique-user-id');
 						const modalMessage = document.getElementById('modal-message');
 
 						displayApiKey.textContent = user.apiKey;
-						displayUniqueUserId.textContent = user.uniqueUserId; // 추가
-						modalMessage.textContent = ''; // 이전 메시지 초기화
+						displayUniqueUserId.textContent = user.uniqueUserId;
+						modalMessage.textContent = '';
 						apiKeyModal.classList.remove('hidden');
 					});
 				}
 			} else {
-				// 로그아웃된 경우: 로그인 버튼 표시
 				authContainer.innerHTML = `<a class="auth-button" href="/member/login.html">Login</a>`;
-				// 로그아웃 시 커스텀 코드 입력창 숨김
 				aliasInputContainer.classList.add('hidden');
 				expirationInputContainer.classList.add('hidden');
 				updateInfoBtnVisibility();
@@ -210,8 +203,21 @@
 			}
 		}
 
+		// 추가: Info 버튼 가시성 업데이트 함수 (Global)
+		function updateInfoBtnVisibility() {
+			const user = window.user || window.getCurrentUser();
+			const infoBtn = document.getElementById('info-btn');
+			const r1Btn = document.getElementById('r1-btn');
+			const r2Btn = document.getElementById('r2-btn');
+
+			if (user && infoBtn && r1Btn && r2Btn && (r1Btn.classList.contains('active') || r2Btn.classList.contains('active'))) {
+				infoBtn.classList.remove('hidden');
+			} else if (infoBtn) {
+				infoBtn.classList.add('hidden');
+			}
+		}
+
 		document.addEventListener('DOMContentLoaded', () => {
-			// 모든 버튼과 UI 요소를 여기서 한 번만 선언합니다.
 			const r1Btn = document.getElementById('r1-btn');
 			const r2Btn = document.getElementById('r2-btn');
 			const r3Btn = document.getElementById('r3-btn');
@@ -224,7 +230,6 @@
 			let user;
 
 			if (urlParams.get('testuser') === '1') {
-				// 테스트용 임시 사용자 정보 (URL에 ?testuser=1 추가 시 활성화)
 				user = {
 					name: 'Test User',
 					picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
@@ -232,20 +237,16 @@
 					uniqueUserId: 'test-user-id-for-viewing-456'
 				};
 			} else {
-				// 페이지 로드 시 localStorage에서 실제 사용자 정보를 가져옵니다.
 				user = window.getCurrentUser();
 			}
 
-			window.user = user; // 다른 스크립트(app.js 등)에서 참조할 수 있도록 전역 변수에 할당
+			window.user = user;
 			updateUIForUser(user);
 
-
-			// 모달 닫기 버튼 이벤트
 			document.getElementById('modal-close-btn').addEventListener('click', () => {
 				document.getElementById('api-key-modal').classList.add('hidden');
 			});
 
-			// API 키 복사 버튼 이벤트
 			document.getElementById('copy-api-key-btn').addEventListener('click', async () => {
 				const apiKey = document.getElementById('display-api-key').textContent;
 				const modalMessage = document.getElementById('modal-message');
@@ -254,11 +255,9 @@
 					modalMessage.textContent = 'API 키가 클립보드에 복사되었습니다.';
 				} catch (err) {
 					modalMessage.textContent = 'API 키 복사 실패.';
-					console.error('Failed to copy API key:', err);
 				}
 			});
 
-			// 고유 사용자 ID 복사 버튼 이벤트 추가
 			document.getElementById('copy-user-id-btn').addEventListener('click', async () => {
 				const uniqueUserId = document.getElementById('display-unique-user-id').textContent;
 				const modalMessage = document.getElementById('modal-message');
@@ -267,85 +266,43 @@
 					modalMessage.textContent = '고유 사용자 ID가 클립보드에 복사되었습니다.';
 				} catch (err) {
 					modalMessage.textContent = '고유 사용자 ID 복사 실패.';
-					console.error('Failed to copy Unique User ID:', err);
 				}
 			});
 
-			// R3 버튼 클릭 핸들러
-			r3Btn.addEventListener('click', (e) => {
-				e.preventDefault();
-				if (!r3Btn.classList.contains('active')) {
-					// 모든 버튼 비활성화 후 현재 버튼만 활성화
-					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
-					r3Btn.classList.add('active');
-					logoImg.src = 'assets/images/logo-r3.jpg';
-					logoImg.alt = 'R3';
-					leadText.textContent = '간단하고 빠른 단축 URL 생성 서비스';
-					if (user) {
-						aliasInputContainer.classList.remove('hidden');
-						expirationInputContainer.classList.add('hidden');
-					}
-				}
-			});
+			// 서비스 전환 핸들러 통합 관리
+			const setMode = (mode) => {
+				[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
+				document.getElementById(`${mode.toLowerCase()}-btn`).classList.add('active');
 
-			// R2 버튼 클릭 핸들러
-			r2Btn.addEventListener('click', (e) => {
-				e.preventDefault();
-				if (!r2Btn.classList.contains('active')) {
-					// 모든 버튼 비활성화 후 현재 버튼만 활성화
-					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
-					r2Btn.classList.add('active');
-
-					logoImg.src = 'assets/images/logo-r2.jpg';
-					logoImg.alt = 'R2';
-					leadText.textContent = '원본 URL 노출을 막아주는 안전한 단축 URL 서비스';
-					if (user) {
-						aliasInputContainer.classList.remove('hidden');
-						expirationInputContainer.classList.add('hidden');
-					}
-				}
-			});
-
-			// R1 버튼 클릭 핸들러
-			r1Btn.addEventListener('click', (e) => {
-				e.preventDefault();
-				if (!r1Btn.classList.contains('active')) {
-					// 모든 버튼 비활성화 후 현재 버튼만 활성화
-					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
-					r1Btn.classList.add('active');
-
-					// NOTE: 'logo-r1.jpg' 파일을 assets/images/ 폴더에 추가해야 합니다.
+				if (mode === 'R1') {
 					logoImg.src = 'assets/images/logo-r1.jpg';
 					logoImg.alt = 'R1';
 					leadText.textContent = '간단하고 빠른 One Time URL 생성 서비스';
-					if (user) {
-						expirationInputContainer.classList.remove('hidden');
-						aliasInputContainer.classList.add('hidden');
-					}
-					updateInfoBtnVisibility();
-				}
-			});
-
-			// R5 버튼 클릭 핸들러
-			r5Btn.addEventListener('click', (e) => {
-				e.preventDefault();
-				if (!r5Btn.classList.contains('active')) {
-					// 모든 버튼 비활성화 후 현재 버튼만 활성화
-					[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
-					r5Btn.classList.add('active');
-
-					// NOTE: 'logo-r5.jpg' 파일을 assets/images/ 폴더에 추가해야 합니다.
+					if (user) { expirationInputContainer.classList.remove('hidden'); aliasInputContainer.classList.add('hidden'); }
+				} else if (mode === 'R2') {
+					logoImg.src = 'assets/images/logo-r2.jpg';
+					logoImg.alt = 'R2';
+					leadText.textContent = '원본 URL 노출을 막아주는 안전한 단축 URL 서비스';
+					if (user) { aliasInputContainer.classList.remove('hidden'); expirationInputContainer.classList.add('hidden'); }
+				} else if (mode === 'R3') {
+					logoImg.src = 'assets/images/logo-r3.jpg';
+					logoImg.alt = 'R3';
+					leadText.textContent = '간단하고 빠른 단축 URL 생성 서비스';
+					if (user) { aliasInputContainer.classList.remove('hidden'); expirationInputContainer.classList.add('hidden'); }
+				} else if (mode === 'R5') {
 					logoImg.src = 'assets/images/logo-r5.jpg';
 					logoImg.alt = 'R5';
 					leadText.textContent = '대용량 파일 서비스에 적합한 단축 URL 생성 서비스';
-					if (user) {
-						aliasInputContainer.classList.remove('hidden');
-						expirationInputContainer.classList.add('hidden');
-					}
+					if (user) { aliasInputContainer.classList.remove('hidden'); expirationInputContainer.classList.add('hidden'); }
 				}
-			});
+				updateInfoBtnVisibility();
+			};
 
-			// 추가: 비디오 모달 관련 스크립트
+			r1Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R1'); });
+			r2Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R2'); });
+			r3Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R3'); });
+			r5Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R5'); });
+
 			const introLink = document.querySelector('.top-right-intro');
 			const videoModal = document.getElementById('video-modal');
 			const closeVideoModal = document.getElementById('close-video-modal');
@@ -353,65 +310,24 @@
 
 			function openIntroVideo() {
 				const videoUrl = introLink.getAttribute('href');
-				videoContainer.innerHTML = `
-					<video style="display: block; width: 100%; height: 100%;" controls autoplay playsinline muted>
-						<source src="${videoUrl}" type="video/mp4">
-						죄송합니다. 비디오를 재생할 수 없습니다.
-					</video>
-				`;
+				videoContainer.innerHTML = `<video style="display: block; width: 100%; height: 100%;" controls autoplay playsinline muted><source src="${videoUrl}" type="video/mp4"></video>`;
 				videoModal.classList.remove('hidden');
 			}
 
-			introLink.addEventListener('click', function (event) {
-				event.preventDefault();
-				openIntroVideo();
-			});
+			introLink.addEventListener('click', (e) => { e.preventDefault(); openIntroVideo(); });
+			if (!localStorage.getItem('hasSeenIntro')) { openIntroVideo(); localStorage.setItem('hasSeenIntro', 'true'); }
+			closeVideoModal.addEventListener('click', () => { videoModal.classList.add('hidden'); videoContainer.innerHTML = ''; });
+			videoModal.addEventListener('click', (e) => { if (e.target === videoModal) { videoModal.classList.add('hidden'); videoContainer.innerHTML = ''; } });
 
-			if (!localStorage.getItem('hasSeenIntro')) {
-				openIntroVideo();
-				localStorage.setItem('hasSeenIntro', 'true');
-			}
-
-			closeVideoModal.addEventListener('click', function () {
-				videoModal.classList.add('hidden');
-				videoContainer.innerHTML = ''; // 비디오 정지
-			});
-
-			videoModal.addEventListener('click', function (e) {
-				if (e.target === this) {
-					this.classList.add('hidden');
-					videoContainer.innerHTML = ''; // 비디오 정지
-				}
-			});
-
-			// 추가: R1 만료일 입력 필드 placeholder 처리
 			const expirationInput = document.getElementById('expiration-input');
-			expirationInput.addEventListener('focus', function () {
-				this.type = 'datetime-local';
-				this.placeholder = '';
-			});
-			expirationInput.addEventListener('blur', function () {
-				if (!this.value) {
-					this.type = 'text';
-					this.placeholder = '만료일';
-				}
-			});
+			expirationInput.addEventListener('focus', function () { this.type = 'datetime-local'; this.placeholder = ''; });
+			expirationInput.addEventListener('blur', function () { if (!this.value) { this.type = 'text'; this.placeholder = '만료일'; } });
 
-			// 추가: Info 버튼 로직
 			const infoBtn = document.getElementById('info-btn');
 			const infoModal = document.getElementById('info-modal');
 			const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
 			const infoModalTitle = document.getElementById('info-modal-title');
 			const infoModalBody = document.getElementById('info-modal-body');
-
-			function updateInfoBtnVisibility() {
-				const user = window.user || window.getCurrentUser();
-				if (user && (r1Btn.classList.contains('active') || r2Btn.classList.contains('active'))) {
-					infoBtn.classList.remove('hidden');
-				} else {
-					infoBtn.classList.add('hidden');
-				}
-			}
 
 			infoBtn.addEventListener('click', () => {
 				if (r1Btn.classList.contains('active')) {
@@ -437,9 +353,6 @@
 
 			infoModalCloseBtn.addEventListener('click', () => infoModal.classList.add('hidden'));
 			infoModal.addEventListener('click', (e) => { if (e.target === infoModal) infoModal.classList.add('hidden'); });
-
-			// 초기화 시 가시성 체크
-			updateInfoBtnVisibility();
 		});
 	</script>
 </body>
