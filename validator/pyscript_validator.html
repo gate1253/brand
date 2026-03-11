@@ -103,12 +103,9 @@
             transition: transform 0.1s, opacity 0.2s;
         }
 
-        button:hover {
-            opacity: 0.9;
-        }
-
-        button:active {
-            transform: scale(0.98);
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .settings {
@@ -116,6 +113,8 @@
             gap: 20px;
             color: var(--text-dim);
             font-size: 0.85rem;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         label {
@@ -124,11 +123,20 @@
             gap: 6px;
         }
 
+        select, input[type="number"] {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            border-radius: 4px;
+            padding: 4px 8px;
+            outline: none;
+        }
+
         #output-container {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.85rem;
             line-height: 1.6;
-            max-height: 500px;
+            max-height: 600px;
             overflow-y: auto;
             border-radius: 12px;
             padding: 20px;
@@ -145,13 +153,12 @@
 
         .loading-spinner {
             display: none;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top: 3px solid var(--accent-primary);
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top: 2px solid var(--accent-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
         }
 
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -172,8 +179,12 @@
             transition: width 0.3s ease;
         }
 
-        /* PyScript Initializing UI overlay */
-        py-script { display: none; }
+        .cors-hint {
+            font-size: 0.75rem;
+            margin-top: 10px;
+            color: var(--warning);
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -181,29 +192,32 @@
 <div class="container">
     <header>
         <h1>HLS Continuum Validator</h1>
-        <p class="subtitle">PyScript + mux.js 를 이용한 브라우저 기반 고정밀 PTS/DTS 분석 도구</p>
+        <p class="subtitle">PyScript + mux.js 를 이용한 브라우저 기반 고정밀 연속성 분석 도구</p>
     </header>
 
     <div class="card">
-        <div class="log-warning" style="font-size: 0.8rem; margin-bottom: 15px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
-            ⚠️ <b>주의:</b> 브라우저 보안 정책(CORS)으로 인해 로컬 파일(file://) 환경에서는 분석이 차단될 수 있습니다. 
-            웹 서버(http://...) 환경에서 실행하거나 전용 프록시 설정을 확인하세요.
-        </div>
         <div class="input-group">
-            <input type="text" id="m3u8-url" placeholder="https://example.com/playlist.m3u8" value="https://kcaqma2025.v4.wecandeo.com/file/1058/42967/V106323/V106323.m3u8">
+            <input type="text" id="m3u8-url" placeholder="분석할 HLS(.m3u8) 주소를 입력하세요" value="">
             <button id="btn-run" py-click="start_analysis">분석 시작</button>
         </div>
         <div class="settings">
             <label>
                 검사 세그먼트 수: 
-                <input type="number" id="max-segs" value="10" min="1" max="100" style="width: 50px; background: transparent; border: 1px solid #334155; color: white; border-radius: 4px; padding: 2px 5px;">
+                <input type="number" id="max-segs" value="10" min="1" max="100" style="width: 60px;">
             </label>
             <label>
-                CORS Proxy 사용:
-                <input type="checkbox" id="use-proxy" checked>
+                프록시:
+                <select id="proxy-select">
+                    <option value="allorigins" selected>AllOrigins</option>
+                    <option value="corsproxyio">CORSProxy.io</option>
+                    <option value="none">직접 연결 (CORS 미지원 시 실패)</option>
+                </select>
             </label>
             <div id="loader" class="loading-spinner"></div>
-            <span id="status-text" style="font-size: 0.8rem; color: var(--accent-primary);">PyScript 초기화 중...</span>
+            <span id="status-text" style="font-size: 0.8rem; color: var(--accent-primary);">준비 완료</span>
+        </div>
+        <div class="cors-hint">
+            ⚠️ <b>CORS 안내:</b> 외부 도메인 영상은 보안 정책상 프록시가 꼭 필요합니다. 에러 발생 시 프록시를 변경해 보세요.
         </div>
         <div class="progress-bar-container" id="progress-container">
             <div id="progress-bar"></div>
@@ -211,23 +225,19 @@
     </div>
 
     <div id="output-container">
-        <div class="log-info">애플리케이션 준비 중...</div>
+        <div class="log-info">애플리케이션이 준비되었습니다. M3U8 주소를 입력하고 분석을 시작하세요.</div>
     </div>
 </div>
 
-<!-- Config for PyScript -->
 <py-config>
     packages = ["m3u8", "ssl", "certifi"]
 </py-config>
 
 <script>
-    // JS Helper: mux.js를 이용한 세그먼트 PTS 추출
-    // Python에서 직접 호출됨
+    // JS Helper: mux.js extraction
     window.parseSegmentTimestamps = async (arrayBuffer) => {
         return new Promise((resolve) => {
             const uint8 = new Uint8Array(arrayBuffer);
-            
-            // Detect format (simplified)
             const isTs = uint8[0] === 0x47;
             let firstPts = null;
             let lastPts = null;
@@ -236,7 +246,6 @@
                 const packetStream = new muxjs.mp2t.TransportPacketStream();
                 const parseStream = new muxjs.mp2t.TransportParseStream();
                 packetStream.pipe(parseStream);
-                
                 parseStream.on('data', (data) => {
                     if (data.type === 'pes' && (data.streamType === 0x1b || data.streamType === 0x24)) {
                         const ptsSeconds = data.pts / 90000;
@@ -244,22 +253,14 @@
                         lastPts = ptsSeconds;
                     }
                 });
-
                 packetStream.push(uint8);
                 packetStream.flush();
             } else {
-                // MP4 fallback
                 try {
                     const firstDts = muxjs.mp4.Probe.findFirstDts(uint8);
-                    if (firstDts !== -1) {
-                        firstPts = firstDts / 90000;
-                        // For fMP4, finding the last PTS is harder without full decode, 
-                        // we'll estimate or just use duration if available.
-                        // For this tool, let's treat first as the primary continuity point.
-                    }
+                    if (firstDts !== -1) firstPts = firstDts / 90000;
                 } catch(e) {}
             }
-            
             resolve({ first: firstPts, last: lastPts });
         });
     };
@@ -284,10 +285,6 @@ import m3u8
 import urllib.parse
 from js import window, document, Uint8Array
 from pyodide.http import pyfetch
-import json
-
-# Settings
-CORS_PROXY = "https://corsproxy.io/?url="
 
 def log(msg, type=None):
     window.addLog(msg, type)
@@ -296,110 +293,111 @@ async def start_analysis(event):
     btn = document.getElementById("btn-run")
     btn.disabled = True
     document.getElementById("loader").style.display = "inline-block"
-    document.getElementById("status-text").innerText = "분석 중..."
+    document.getElementById("status-text").innerText = "분석 시작 중..."
     document.getElementById("progress-container").style.display = "block"
     document.getElementById("output-container").innerHTML = ""
     window.updateProgress(0)
 
     url = document.getElementById("m3u8-url").value
+    if not url:
+        log("HLS URL을 입력해 주세요.", "error")
+        reset_ui()
+        return
+
     max_segs = int(document.getElementById("max-segs").value)
-    use_proxy = document.getElementById("use-proxy").checked
+    proxy_type = document.getElementById("proxy-select").value
 
     try:
-        await check_hls_continuity(url, max_segs, use_proxy)
+        await check_hls_continuity(url, max_segs, proxy_type)
     except Exception as e:
-        log(f"실행 오류: {str(e)}", "error")
+        log(f"분석 중 치명적 오류: {str(e)}", "error")
     finally:
-        btn.disabled = False
-        document.getElementById("loader").style.display = "none"
-        document.getElementById("status-text").innerText = "완료"
+        reset_ui()
 
-async def fetch_bytes(url, use_proxy):
-    final_url = f"https://api.allorigins.win/raw?url={urllib.parse.quote(url)}" if use_proxy else url
-    response = await pyfetch(final_url)
-    if not response.ok:
-        raise Exception(f"데이터 로드 실패 (Status: {response.status})")
-    return await response.bytes()
+def reset_ui():
+    document.getElementById("btn-run").disabled = False
+    document.getElementById("loader").style.display = "none"
+    document.getElementById("status-text").innerText = "완료"
 
-async def check_hls_continuity(m3u8_url, max_segments, use_proxy):
-    log(f"[*] M3U8 분석 시작: {m3u8_url}", "header")
+def wrap_proxy(url, p_type):
+    if p_type == "allorigins":
+        return f"https://api.allorigins.win/raw?url={urllib.parse.quote(url)}"
+    elif p_type == "corsproxyio":
+        return f"https://corsproxy.io/?{urllib.parse.quote(url)}"
+    return url
+
+async def smart_fetch(url, p_type):
+    try:
+        res = await pyfetch(wrap_proxy(url, p_type))
+        if res.ok: return res
+    except: pass
+    
+    if p_type != "none":
+        alt = "corsproxyio" if p_type == "allorigins" else "allorigins"
+        log(f"  [재시도] 프록시 전환 ({p_type} -> {alt})", "warning")
+        try:
+            res = await pyfetch(wrap_proxy(url, alt))
+            if res.ok: return res
+        except: pass
+    
+    raise Exception(f"네트워크 오류: {url} 로드 실패")
+
+async def check_hls_continuity(m3u8_url, max_segments, proxy_type):
+    log(f"[*] 분석 시작: {m3u8_url}", "header")
     
     try:
-        # Load M3U8 content
-        proxy_prefix = "https://api.allorigins.win/raw?url=" if use_proxy else ""
-        content_response = await pyfetch(proxy_prefix + urllib.parse.quote(m3u8_url))
-        content = await content_response.string()
+        resp = await smart_fetch(m3u8_url, proxy_type)
+        content = await resp.string()
         playlist = m3u8.loads(content, uri=m3u8_url)
     except Exception as e:
-        log(f"[!] M3U8 로드 실패: {e}", "error")
+        log(f"플레이리스트 로드 실패: {e}", "error")
         return
 
     if playlist.is_variant:
-        log("[*] 마스터 플레이리스트 감지됨. 첫 번째 하위 스트림으로 이동합니다.", "info")
-        media_url = playlist.playlists[0].absolute_uri
-        content_response = await pyfetch(CORS_PROXY + urllib.parse.quote(media_url) if use_proxy else media_url)
-        content = await content_response.string()
-        playlist = m3u8.loads(content, uri=media_url)
+        log("[*] 마스터 플레이리스트 감지. 스트림 선택 중...", "info")
+        m3u8_url = playlist.playlists[0].absolute_uri
+        resp = await smart_fetch(m3u8_url, proxy_type)
+        content = await resp.string()
+        playlist = m3u8.loads(content, uri=m3u8_url)
 
     segments = playlist.segments
     if not segments:
-        log("[!] 세그먼트를 찾을 수 없습니다.", "error")
+        log("세그먼트 정보를 찾을 수 없습니다.", "error")
         return
 
-    check_count = min(len(segments), max_segments)
-    log(f"[*] 총 {len(segments)}개의 세그먼트 중 처음 {check_count}개를 검사합니다.", "info")
-
-    prev_last_pts = None
+    count = min(len(segments), max_segments)
+    log(f"[*] 총 {len(segments)}개 중 {count}개 분석", "info")
     
-    for i in range(check_count):
-        segment = segments[i]
-        seg_url = segment.absolute_uri
-        
-        log(f"--- Segment {i} 분석 중 ---", "header")
+    last_pts_end = None
+    for i in range(count):
+        document.getElementById("status-text").innerText = f"분석 중 ({i+1}/{count})"
+        seg = segments[i]
+        log(f"Seg {i}: {seg.uri}", "header")
         
         try:
-            # Fetch segment bytes
-            seg_bytes = await fetch_bytes(seg_url, use_proxy)
+            r = await smart_fetch(seg.absolute_uri, proxy_type)
+            data = await r.bytes()
+            ts = await window.parseSegmentTimestamps(Uint8Array.new(data).buffer)
             
-            # Use JS mux.js helper
-            # convert bytes to Uint8Array for JS
-            js_arr = Uint8Array.new(seg_bytes)
-            ts_info = await window.parseSegmentTimestamps(js_arr.buffer)
-            # ts_info is a JS Object {first: ..., last: ...}
-            
-            first_pts = ts_info.first
-            last_pts = ts_info.last
-            
-            if first_pts is None:
-                log("  [경고] 타임스탬프를 찾을 수 없습니다. (비디오 트랙 없음)", "warning")
+            p_start, p_end = ts.first, ts.last
+            if p_start is None:
+                log("  [!] PTS 데이터 없음", "warning")
                 continue
                 
-            log(f"  시작 PTS: {first_pts:.4f} / 종료 PTS: {last_pts if last_pts else '?'}", "info")
-            if last_pts:
-                log(f"  재생 길이: {last_pts - first_pts:.4f}s", "info")
-            
-            # Continuity Check
-            if prev_last_pts is not None:
-                gap = first_pts - prev_last_pts
-                
-                if gap > 0.1:
-                    log(f"  [오류 후보] 🚨 이전 세그먼트와 시간이 뚝 끊겼습니다! (Gap: +{gap:.4f}초)", "error")
-                elif gap < -0.1:
-                    log(f"  [오류 후보] 🚨 이전 세그먼트와 시간이 겹칩니다! (Overlap: {gap:.4f}초)", "error")
+            log(f"  PTS: {p_start:.3f} ~ {p_end if p_end else '?'}", "info")
+            if last_pts_end is not None:
+                diff = p_start - last_pts_end
+                if abs(diff) > 0.1:
+                    log(f"  🚨 {'Gap' if diff > 0 else 'Overlap'}: {diff:.3f}s", "error")
                 else:
-                    log(f"  [정상] 이전 세그먼트와 부드럽게 이어집니다. (차이: {gap:.4f}초)", "success")
-                    
-            prev_last_pts = last_pts
-            window.updateProgress(int((i+1) / check_count * 100))
+                    log(f"  ✅ 연속성 정상 ({diff:.3f}s)", "success")
             
+            last_pts_end = p_end
+            window.updateProgress(int((i+1)/count * 100))
         except Exception as e:
-            log(f"  [에러] 세그먼트 분석 실패: {str(e)}", "error")
+            log(f"  [!] 세그먼트 오류: {e}", "error")
 
-    log("\n[완료] 검사가 완료되었습니다.", "header")
-
-# Final boot signal
-document.getElementById("status-text").innerText = "준비 완료"
-document.getElementById("output-container").innerHTML = '<div class="log-success">애플리케이션이 준비되었습니다. 분석을 시작하세요.</div>'
+    log("[*] 모든 분석 완료", "header")
 </py-script>
 
 </body>
