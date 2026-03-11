@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Continuum Validator (PyScript)</title>
+    
+    <!-- Libraries -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2023.11.1/core.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mux.js/6.3.0/mux.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        p.subtitle {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent-primary);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .settings {
+            display: flex;
+            gap: 20px;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #output-container {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 12px;
+            padding: 20px;
+            background: #020617;
+            border: 1px solid #1e293b;
+        }
+
+        .log-entry { margin-bottom: 8px; border-left: 2px solid #334155; padding-left: 12px; }
+        .log-header { color: var(--accent-primary); font-weight: 600; margin-top: 16px; }
+        .log-success { color: var(--success); }
+        .log-error { color: var(--error); font-weight: 600; }
+        .log-warning { color: var(--warning); }
+        .log-info { color: var(--text-dim); }
+
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+            display: none;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--accent-primary);
+            transition: width 0.3s ease;
+        }
+
+        /* PyScript Initializing UI overlay */
+        py-script { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>HLS Continuum Validator</h1>
+        <p class="subtitle">PyScript + mux.js 를 이용한 브라우저 기반 고정밀 PTS/DTS 분석 도구</p>
+    </header>
+
+    <div class="card">
+        <div class="log-warning" style="font-size: 0.8rem; margin-bottom: 15px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">
+            ⚠️ <b>주의:</b> 브라우저 보안 정책(CORS)으로 인해 로컬 파일(file://) 환경에서는 분석이 차단될 수 있습니다. 
+            웹 서버(http://...) 환경에서 실행하거나 전용 프록시 설정을 확인하세요.
+        </div>
+        <div class="input-group">
+            <input type="text" id="m3u8-url" placeholder="https://example.com/playlist.m3u8" value="https://kcaqma2025.v4.wecandeo.com/file/1058/42967/V106323/V106323.m3u8">
+            <button id="btn-run" py-click="start_analysis">분석 시작</button>
+        </div>
+        <div class="settings">
+            <label>
+                검사 세그먼트 수: 
+                <input type="number" id="max-segs" value="10" min="1" max="100" style="width: 50px; background: transparent; border: 1px solid #334155; color: white; border-radius: 4px; padding: 2px 5px;">
+            </label>
+            <label>
+                CORS Proxy 사용:
+                <input type="checkbox" id="use-proxy" checked>
+            </label>
+            <div id="loader" class="loading-spinner"></div>
+            <span id="status-text" style="font-size: 0.8rem; color: var(--accent-primary);">PyScript 초기화 중...</span>
+        </div>
+        <div class="progress-bar-container" id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div id="output-container">
+        <div class="log-info">애플리케이션 준비 중...</div>
+    </div>
+</div>
+
+<!-- Config for PyScript -->
+<py-config>
+    packages = ["m3u8", "ssl", "certifi"]
+</py-config>
+
+<script>
+    // JS Helper: mux.js를 이용한 세그먼트 PTS 추출
+    // Python에서 직접 호출됨
+    window.parseSegmentTimestamps = async (arrayBuffer) => {
+        return new Promise((resolve) => {
+            const uint8 = new Uint8Array(arrayBuffer);
+            
+            // Detect format (simplified)
+            const isTs = uint8[0] === 0x47;
+            let firstPts = null;
+            let lastPts = null;
+
+            if (isTs) {
+                const packetStream = new muxjs.mp2t.TransportPacketStream();
+                const parseStream = new muxjs.mp2t.TransportParseStream();
+                packetStream.pipe(parseStream);
+                
+                parseStream.on('data', (data) => {
+                    if (data.type === 'pes' && (data.streamType === 0x1b || data.streamType === 0x24)) {
+                        const ptsSeconds = data.pts / 90000;
+                        if (firstPts === null) firstPts = ptsSeconds;
+                        lastPts = ptsSeconds;
+                    }
+                });
+
+                packetStream.push(uint8);
+                packetStream.flush();
+            } else {
+                // MP4 fallback
+                try {
+                    const firstDts = muxjs.mp4.Probe.findFirstDts(uint8);
+                    if (firstDts !== -1) {
+                        firstPts = firstDts / 90000;
+                        // For fMP4, finding the last PTS is harder without full decode, 
+                        // we'll estimate or just use duration if available.
+                        // For this tool, let's treat first as the primary continuity point.
+                    }
+                } catch(e) {}
+            }
+            
+            resolve({ first: firstPts, last: lastPts });
+        });
+    };
+
+    window.addLog = (msg, type) => {
+        const out = document.getElementById('output-container');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry' + (type ? ' log-' + type : '');
+        entry.innerHTML = msg;
+        out.appendChild(entry);
+        out.scrollTop = out.scrollHeight;
+    };
+
+    window.updateProgress = (percent) => {
+        document.getElementById('progress-bar').style.width = percent + '%';
+    };
+</script>
+
+<py-script>
+import asyncio
+import m3u8
+import urllib.parse
+from js import window, document, Uint8Array
+from pyodide.http import pyfetch
+import json
+
+# Settings
+CORS_PROXY = "https://corsproxy.io/?url="
+
+def log(msg, type=None):
+    window.addLog(msg, type)
+
+async def start_analysis(event):
+    btn = document.getElementById("btn-run")
+    btn.disabled = True
+    document.getElementById("loader").style.display = "inline-block"
+    document.getElementById("status-text").innerText = "분석 중..."
+    document.getElementById("progress-container").style.display = "block"
+    document.getElementById("output-container").innerHTML = ""
+    window.updateProgress(0)
+
+    url = document.getElementById("m3u8-url").value
+    max_segs = int(document.getElementById("max-segs").value)
+    use_proxy = document.getElementById("use-proxy").checked
+
+    try:
+        await check_hls_continuity(url, max_segs, use_proxy)
+    except Exception as e:
+        log(f"실행 오류: {str(e)}", "error")
+    finally:
+        btn.disabled = False
+        document.getElementById("loader").style.display = "none"
+        document.getElementById("status-text").innerText = "완료"
+
+async def fetch_bytes(url, use_proxy):
+    final_url = f"https://api.allorigins.win/raw?url={urllib.parse.quote(url)}" if use_proxy else url
+    response = await pyfetch(final_url)
+    if not response.ok:
+        raise Exception(f"데이터 로드 실패 (Status: {response.status})")
+    return await response.bytes()
+
+async def check_hls_continuity(m3u8_url, max_segments, use_proxy):
+    log(f"[*] M3U8 분석 시작: {m3u8_url}", "header")
+    
+    try:
+        # Load M3U8 content
+        proxy_prefix = "https://api.allorigins.win/raw?url=" if use_proxy else ""
+        content_response = await pyfetch(proxy_prefix + urllib.parse.quote(m3u8_url))
+        content = await content_response.string()
+        playlist = m3u8.loads(content, uri=m3u8_url)
+    except Exception as e:
+        log(f"[!] M3U8 로드 실패: {e}", "error")
+        return
+
+    if playlist.is_variant:
+        log("[*] 마스터 플레이리스트 감지됨. 첫 번째 하위 스트림으로 이동합니다.", "info")
+        media_url = playlist.playlists[0].absolute_uri
+        content_response = await pyfetch(CORS_PROXY + urllib.parse.quote(media_url) if use_proxy else media_url)
+        content = await content_response.string()
+        playlist = m3u8.loads(content, uri=media_url)
+
+    segments = playlist.segments
+    if not segments:
+        log("[!] 세그먼트를 찾을 수 없습니다.", "error")
+        return
+
+    check_count = min(len(segments), max_segments)
+    log(f"[*] 총 {len(segments)}개의 세그먼트 중 처음 {check_count}개를 검사합니다.", "info")
+
+    prev_last_pts = None
+    
+    for i in range(check_count):
+        segment = segments[i]
+        seg_url = segment.absolute_uri
+        
+        log(f"--- Segment {i} 분석 중 ---", "header")
+        
+        try:
+            # Fetch segment bytes
+            seg_bytes = await fetch_bytes(seg_url, use_proxy)
+            
+            # Use JS mux.js helper
+            # convert bytes to Uint8Array for JS
+            js_arr = Uint8Array.new(seg_bytes)
+            ts_info = await window.parseSegmentTimestamps(js_arr.buffer)
+            # ts_info is a JS Object {first: ..., last: ...}
+            
+            first_pts = ts_info.first
+            last_pts = ts_info.last
+            
+            if first_pts is None:
+                log("  [경고] 타임스탬프를 찾을 수 없습니다. (비디오 트랙 없음)", "warning")
+                continue
+                
+            log(f"  시작 PTS: {first_pts:.4f} / 종료 PTS: {last_pts if last_pts else '?'}", "info")
+            if last_pts:
+                log(f"  재생 길이: {last_pts - first_pts:.4f}s", "info")
+            
+            # Continuity Check
+            if prev_last_pts is not None:
+                gap = first_pts - prev_last_pts
+                
+                if gap > 0.1:
+                    log(f"  [오류 후보] 🚨 이전 세그먼트와 시간이 뚝 끊겼습니다! (Gap: +{gap:.4f}초)", "error")
+                elif gap < -0.1:
+                    log(f"  [오류 후보] 🚨 이전 세그먼트와 시간이 겹칩니다! (Overlap: {gap:.4f}초)", "error")
+                else:
+                    log(f"  [정상] 이전 세그먼트와 부드럽게 이어집니다. (차이: {gap:.4f}초)", "success")
+                    
+            prev_last_pts = last_pts
+            window.updateProgress(int((i+1) / check_count * 100))
+            
+        except Exception as e:
+            log(f"  [에러] 세그먼트 분석 실패: {str(e)}", "error")
+
+    log("\n[완료] 검사가 완료되었습니다.", "header")
+
+# Final boot signal
+document.getElementById("status-text").innerText = "준비 완료"
+document.getElementById("output-container").innerHTML = '<div class="log-success">애플리케이션이 준비되었습니다. 분석을 시작하세요.</div>'
+</py-script>
+
+</body>
+</html>
