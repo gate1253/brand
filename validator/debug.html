@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Android HLS Debugger | GATE1253</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --danger: #d93025;
+            --warning: #f9ab00;
+            --success: #1e8e3e;
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #e8eaed;
+            --text-sub: #9aa0a6;
+            --mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 16px;
+            background: #000;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        /* Player Section */
+        .player-container {
+            width: 100%;
+            background: #000;
+            position: relative;
+            background-size: contain;
+        }
+
+        video {
+            width: 100%;
+            display: block;
+            aspect-ratio: 16/9;
+        }
+
+        /* Stats Section */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1px;
+            background: #333;
+            border-bottom: 1px solid #333;
+        }
+
+        .stat-box {
+            background: var(--card-bg);
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: var(--mono);
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .stat-value.warning { color: var(--warning); }
+        .stat-value.danger { color: var(--danger); }
+
+        /* Controls Section */
+        .controls {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--card-bg);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #000;
+            color: white;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: #333; color: white; }
+
+        /* Log Section */
+        .log-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .log-header {
+            padding: 8px 16px;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-header span { font-size: 12px; font-weight: 600; }
+
+        #log-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            font-family: var(--mono);
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            padding: 6px 8px;
+            border-bottom: 1px solid #222;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #ddd; /* Ensure text is visible */
+        }
+
+        .log-time { color: #555; margin-right: 8px; }
+        .log-type { font-weight: 700; margin-right: 8px; }
+        .log-error { color: var(--danger); background: rgba(217, 48, 37, 0.1); }
+        .log-warn { color: var(--warning); }
+        .log-info { color: #8ab4f8; }
+        .log-success { color: var(--success); }
+
+        .dts-info {
+            display: block;
+            margin-top: 4px;
+            padding: 4px;
+            background: rgba(0,0,0,0.5);
+            border-left: 2px solid var(--danger);
+            color: #ff9999;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ANDROID HLS DEBUGGER</h1>
+    </header>
+
+    <div class="player-container">
+        <video id="video" controls playsinline></video>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div id="v-end" class="stat-value">0.000</div>
+            <div class="stat-label">Video End (s)</div>
+        </div>
+        <div class="stat-box">
+            <div id="a-end" class="stat-value">0.000</div>
+            <div class="stat-label">Audio End (s)</div>
+        </div>
+        <div class="stat-box">
+            <div id="buffer-gap" class="stat-value">0</div>
+            <div class="stat-label">V-A Gap (ms)</div>
+        </div>
+        <div class="stat-box">
+            <div id="error-count" class="stat-value">0</div>
+            <div class="stat-label">Errors</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="input-group">
+            <input type="text" id="hls-url" placeholder="HLS URL (.m3u8)" value="">
+            <button id="load-btn" class="btn btn-primary">LOAD</button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button id="clear-log-btn" class="btn btn-secondary" style="flex: 1;">CLEAR LOG</button>
+            <button id="copy-log-btn" class="btn btn-secondary" style="flex: 1;">COPY LOG</button>
+        </div>
+    </div>
+
+    <div class="log-section">
+        <div class="log-header">
+            <span>REAL-TIME EVENTS</span>
+            <span id="hls-ver"></span>
+        </div>
+        <div id="log-container"></div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const urlInput = document.getElementById('hls-url');
+        const loadBtn = document.getElementById('load-btn');
+        const clearLogBtn = document.getElementById('clear-log-btn');
+        const copyLogBtn = document.getElementById('copy-log-btn');
+        const logContainer = document.getElementById('log-container');
+        const hlsVerEl = document.getElementById('hls-ver');
+
+        const stats = {
+            vEnd: document.getElementById('v-end'),
+            aEnd: document.getElementById('a-end'),
+            gap: document.getElementById('buffer-gap'),
+            errors: document.getElementById('error-count')
+        };
+
+        let hls = null;
+        let errorCount = 0;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            hlsVerEl.textContent = `hls.js ${Hls.version}`;
+            addLog(`시스템 시작됨. Hls.js ${Hls.version}`, 'success');
+        });
+
+        loadBtn.addEventListener('click', loadStream);
+        clearLogBtn.addEventListener('click', () => { logContainer.innerHTML = ''; });
+        copyLogBtn.addEventListener('click', copyLogs);
+
+        function loadStream() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                addLog('URL을 입력해주세요.', 'warn');
+                return;
+            }
+
+            if (hls) {
+                hls.destroy();
+            }
+
+            if (Hls.isSupported()) {
+                addLog(`HLS.js 지원됨. 스트림 로드 중: ${url}`, 'info');
+                hls = new Hls({
+                    debug: false, // We handle logging ourselves
+                    enableWorker: true
+                });
+
+                hls.loadSource(url);
+                hls.attachMedia(video);
+
+                // Event Listeners
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    addLog('매니페스트 파싱 완료. 재생 준비됨.', 'success');
+                    video.play().catch(e => addLog(`자동 재생 실패: ${e.message}`, 'warn'));
+                });
+
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    errorCount++;
+                    stats.errors.textContent = errorCount;
+                    
+                    let logMsg = `[ERROR] ${data.type} / ${data.details}`;
+                    if (data.fatal) {
+                        logMsg = `[FATAL] ${logMsg}`;
+                        handleFatalError(data);
+                    }
+
+                    const entry = addLog(logMsg, 'error');
+
+                    // Extract DTS for specific errors
+                    if (data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR || 
+                        data.details === Hls.ErrorDetails.BUFFER_APPEND_ERROR) {
+                        
+                        let dtsInfo = '';
+                        if (data.frag) {
+                            dtsInfo += `Frag: SN#${data.frag.sn}, StartDTS: ${data.frag.startDTS}, EndDTS: ${data.frag.endDTS}`;
+                        }
+                        if (data.err && data.err.message) {
+                            dtsInfo += `\nSystem: ${data.err.message}`;
+                        }
+
+                        if (dtsInfo) {
+                            const dtsDiv = document.createElement('span');
+                            dtsDiv.className = 'dts-info';
+                            dtsDiv.textContent = dtsInfo;
+                            entry.appendChild(dtsDiv);
+                        }
+                    }
+                });
+
+                // Periodic Buffer Monitor
+                setInterval(updateBufferStats, 500);
+
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                addLog('HLS.js 미지원 (네이티브 재생 시도)', 'info');
+                video.src = url;
+            } else {
+                addLog('HLS 재생을 지원하지 않는 브라우저입니다.', 'error');
+            }
+        }
+
+        function handleFatalError(data) {
+            switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                    addLog('네트워크 에러 발생. 복구 시도...', 'warn');
+                    hls.startLoad();
+                    break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                    addLog('미디어 에러 발생. 복구 시도...', 'warn');
+                    hls.recoverMediaError();
+                    break;
+                default:
+                    addLog('복구 불가능한 에러. 재로드 필요.', 'error');
+                    hls.destroy();
+                    break;
+            }
+        }
+
+        function updateBufferStats() {
+            if (!video.buffered || video.buffered.length === 0) return;
+
+            let videoEnd = 0;
+            let audioEnd = 0;
+
+            // In Chrome, we can sometimes distinguish tracks via SourceBuffer, 
+            // but hls.js manages them. A simpler way is to check the common buffer end.
+            // For specifically V-A gap, hls.js internal state is better.
+            
+            if (hls && hls.mainForwardBufferInfo) {
+                // hls.js provides buffer info
+                const info = hls.mainForwardBufferInfo;
+                // Note: Getting precise per-track end requires accessing SourceBuffers.
+            }
+
+            // Fallback to HTMLMediaElement buffered range for overall end
+            const lastRange = video.buffered.length - 1;
+            const commonEnd = video.buffered.end(lastRange);
+            
+            // For a true V-A gap check on Android:
+            try {
+                const sbVideo = hls?.bufferController?.sourceBuffer?.video;
+                const sbAudio = hls?.bufferController?.sourceBuffer?.audio;
+
+                if (sbVideo && sbVideo.buffered.length > 0) {
+                    videoEnd = sbVideo.buffered.end(sbVideo.buffered.length - 1);
+                }
+                if (sbAudio && sbAudio.buffered.length > 0) {
+                    audioEnd = sbAudio.buffered.end(sbAudio.buffered.length - 1);
+                }
+
+                if (videoEnd > 0 && audioEnd > 0) {
+                    const gap = Math.abs(videoEnd - audioEnd) * 1000; // ms
+                    stats.vEnd.textContent = videoEnd.toFixed(3);
+                    stats.aEnd.textContent = audioEnd.toFixed(3);
+                    stats.gap.textContent = Math.round(gap);
+
+                    if (gap > 500) {
+                        stats.gap.className = 'stat-value danger';
+                    } else if (gap > 100) {
+                        stats.gap.className = 'stat-value warning';
+                    } else {
+                        stats.gap.className = 'stat-value';
+                    }
+                }
+            } catch (e) {
+                // Some browsers might not expose hls.js internals this way
+                stats.vEnd.textContent = commonEnd.toFixed(3);
+            }
+        }
+
+        function addLog(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            
+            const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+            entry.innerHTML = `<span class="log-time">${time}</span><span class="log-type">[${type.toUpperCase()}]</span>${msg}`;
+            
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            return entry;
+        }
+
+        function copyLogs() {
+            const text = logContainer.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('로그가 클립보드에 복사되었습니다.');
+            }).catch(err => {
+                alert('복사 실패: ' + err);
+            });
+        }
+    </script>
+</body>
+</html>
