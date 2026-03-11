@@ -353,7 +353,10 @@
                 if (!response.ok) throw new Error('Playlist fetch failed');
                 const text = await response.text();
                 
-                const segmentUrls = parsePlaylist(text, url);
+                // Redirect 대응: fetch 후의 최종 URL(response.url)을 기준 주소로 사용
+                const finalUrl = response.url;
+                const segmentUrls = parsePlaylist(text, finalUrl);
+                
                 if (segmentUrls.length === 0) throw new Error('No segments found in playlist');
 
                 showStatus(`${segmentUrls.length}개의 세그먼트를 분석합니다...`, 'info');
@@ -401,15 +404,16 @@
         function parsePlaylist(text, baseUrl) {
             const lines = text.split('\n');
             const urls = [];
-            const base = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
 
             for (let line of lines) {
                 line = line.trim();
                 if (line && !line.startsWith('#')) {
-                    if (line.startsWith('http')) {
-                        urls.push(line);
-                    } else {
-                        urls.push(base + line);
+                    try {
+                        // URL 생성자를 사용하여 상대 경로를 기준 주소(baseUrl)에 맞춰 절대 경로로 변환
+                        const absoluteUrl = new URL(line, baseUrl).href;
+                        urls.push(absoluteUrl);
+                    } catch (e) {
+                        console.error(`Invalid URL line: ${line}`, e);
                     }
                 }
             }
@@ -418,63 +422,37 @@
 
         async function analyzeSegment(url, index) {
             try {
-                showStatus(`세그먼트 #${index} 다운로드 중...`, 'info');
                 const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-                
                 const buffer = await response.arrayBuffer();
                 const uint8 = new Uint8Array(buffer);
 
-                // Use muxjs's Transmuxer to find DTS
+                // Using mux.js to probe
                 const transmuxer = new muxjs.mp4.Transmuxer();
-                let videoDtsFound = false;
-                let audioDtsFound = false;
+                let videoDts = -1;
+                let audioDts = -1;
 
                 transmuxer.on('data', (data) => {
-                    // mux.js emits 'data' for each segment of MP4 it produces
-                    // we can look at data.dts if available, or track info
-                    // Some versions of mux.js provide timing in the data object
-                    
-                    if (data.type === 'video' && !videoDtsFound) {
-                        if (typeof data.dts !== 'undefined') {
-                            logDts('video', index, data.dts);
-                            videoDtsFound = true;
-                        }
-                    } else if (data.type === 'audio' && !audioDtsFound) {
-                        if (typeof data.dts !== 'undefined') {
-                            logDts('audio', index, data.dts);
-                            audioDtsFound = true;
-                        }
+                    if (data.type === 'video' && videoDts === -1) {
+                        videoDts = data.dts;
+                    } else if (data.type === 'audio' && audioDts === -1) {
+                        audioDts = data.dts;
                     }
                 });
 
-                // Fallback: If 'data' event doesn't have DTS, try monitoring 'done' or using Probe
-                // But for TS, Transmuxer is usually good.
-                
                 transmuxer.push(uint8);
                 transmuxer.flush();
 
-                if (!videoDtsFound && !audioDtsFound) {
-                    console.warn(`Segment ${index} contains no timing info or format unsupported.`);
-                    // Let's try to add a raw log for it
-                    addRawLog(index, 'Timing not found (fMP4 or Unsupported TS)');
-                }
+                if (videoDts !== -1) logDts('video', index, videoDts);
+                if (audioDts !== -1) logDts('audio', index, audioDts);
 
                 state.totalSegments++;
                 elements.segCount.textContent = state.totalSegments;
 
             } catch (err) {
                 console.error(`Segment ${index} error:`, err);
-                showStatus(`세그먼트 #${index} 오류: ${err.message}`, 'error');
             }
         }
 
-        function addRawLog(seq, msg) {
-            const row = document.createElement('div');
-            row.className = 'log-entry warn';
-            row.innerHTML = `<div>#${seq}</div><div>-</div><div>${msg}</div>`;
-            elements.videoLog.insertBefore(row, elements.videoLog.children[1]);
-        }
 
         function logDts(type, seq, dts) {
             const track = state[type];
