@@ -208,7 +208,8 @@
             <label>
                 프록시:
                 <select id="proxy-select">
-                    <option value="allorigins" selected>AllOrigins</option>
+                    <option value="codetabs" selected>CodeTabs (추천)</option>
+                    <option value="allorigins">AllOrigins</option>
                     <option value="corsproxyio">CORSProxy.io</option>
                     <option value="none">직접 연결 (CORS 미지원 시 실패)</option>
                 </select>
@@ -217,7 +218,7 @@
             <span id="status-text" style="font-size: 0.8rem; color: var(--accent-primary);">준비 완료</span>
         </div>
         <div class="cors-hint">
-            ⚠️ <b>CORS 안내:</b> 외부 도메인 영상은 보안 정책상 프록시가 꼭 필요합니다. 에러 발생 시 프록시를 변경해 보세요.
+            ⚠️ <b>CORS 안내:</b> 외부 도메인 영상은 보안 정책상 프록시가 꼭 필요합니다. 에러 발생 시 다른 대안 앱이나 브라우저 확장을 사용해주세요.
         </div>
         <div class="progress-bar-container" id="progress-container">
             <div id="progress-bar"></div>
@@ -320,7 +321,9 @@ def reset_ui():
     document.getElementById("status-text").innerText = "완료"
 
 def wrap_proxy(url, p_type):
-    if p_type == "allorigins":
+    if p_type == "codetabs":
+        return f"https://api.codetabs.com/v1/proxy?quest={url}"
+    elif p_type == "allorigins":
         return f"https://api.allorigins.win/raw?url={urllib.parse.quote(url)}"
     elif p_type == "corsproxyio":
         return f"https://corsproxy.io/?{urllib.parse.quote(url)}"
@@ -333,14 +336,18 @@ async def smart_fetch(url, p_type):
     except: pass
     
     if p_type != "none":
-        alt = "corsproxyio" if p_type == "allorigins" else "allorigins"
-        log(f"  [재시도] 프록시 전환 ({p_type} -> {alt})", "warning")
-        try:
-            res = await pyfetch(wrap_proxy(url, alt))
-            if res.ok: return res
-        except: pass
+        proxies = ["codetabs", "allorigins", "corsproxyio"]
+        if p_type in proxies:
+            proxies.remove(p_type)
+        
+        for alt in proxies:
+            log(f"  [재시도] 프록시 전환 ({alt})", "warning")
+            try:
+                res = await pyfetch(wrap_proxy(url, alt))
+                if res.ok: return res
+            except: pass
     
-    raise Exception(f"네트워크 오류: {url} 로드 실패")
+    raise Exception(f"네트워크 오류 (모든 프록시 실패): {url[:50]}...")
 
 async def check_hls_continuity(m3u8_url, max_segments, proxy_type):
     log(f"[*] 분석 시작: {m3u8_url}", "header")
