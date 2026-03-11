@@ -206,13 +206,8 @@
                 <input type="number" id="max-segs" value="10" min="1" max="100" style="width: 60px;">
             </label>
             <label>
-                프록시:
-                <select id="proxy-select">
-                    <option value="codetabs" selected>CodeTabs (추천)</option>
-                    <option value="allorigins">AllOrigins</option>
-                    <option value="corsproxyio">CORSProxy.io</option>
-                    <option value="none">직접 연결 (CORS 미지원 시 실패)</option>
-                </select>
+                프록시 URL 프리픽스 (선택):
+                <input type="text" id="proxy-prefix" placeholder="https://my-proxy.workers.dev/?url=" value="" style="width: 250px; padding: 4px 8px; font-size: 0.8rem;">
             </label>
             <div id="loader" class="loading-spinner"></div>
             <span id="status-text" style="font-size: 0.8rem; color: var(--accent-primary);">준비 완료</span>
@@ -306,10 +301,10 @@ async def start_analysis(event):
         return
 
     max_segs = int(document.getElementById("max-segs").value)
-    proxy_type = document.getElementById("proxy-select").value
+    proxy_prefix = document.getElementById("proxy-prefix").value.strip()
 
     try:
-        await check_hls_continuity(url, max_segs, proxy_type)
+        await check_hls_continuity(url, max_segs, proxy_prefix)
     except Exception as e:
         log(f"분석 중 치명적 오류: {str(e)}", "error")
     finally:
@@ -320,40 +315,31 @@ def reset_ui():
     document.getElementById("loader").style.display = "none"
     document.getElementById("status-text").innerText = "완료"
 
-def wrap_proxy(url, p_type):
-    if p_type == "codetabs":
-        return f"https://api.codetabs.com/v1/proxy?quest={url}"
-    elif p_type == "allorigins":
-        return f"https://api.allorigins.win/raw?url={urllib.parse.quote(url)}"
-    elif p_type == "corsproxyio":
-        return f"https://corsproxy.io/?{urllib.parse.quote(url)}"
-    return url
+def wrap_proxy(url, prefix):
+    if not prefix:
+        return url
+    
+    # 만약 prefix 끝에 url 파라미터가 명시되어 있다면 인코딩해서 붙임 (예: ?url=)
+    if prefix.endswith("="):
+        return prefix + urllib.parse.quote(url)
+    
+    # 그 외에는 그냥 단순 문자열 합치기 (예: https://proxy.com/)
+    return prefix + url
 
-async def smart_fetch(url, p_type):
+async def fetch_with_proxy(url, prefix):
+    final_url = wrap_proxy(url, prefix)
     try:
-        res = await pyfetch(wrap_proxy(url, p_type))
+        res = await pyfetch(final_url)
         if res.ok: return res
-    except: pass
-    
-    if p_type != "none":
-        proxies = ["codetabs", "allorigins", "corsproxyio"]
-        if p_type in proxies:
-            proxies.remove(p_type)
-        
-        for alt in proxies:
-            log(f"  [재시도] 프록시 전환 ({alt})", "warning")
-            try:
-                res = await pyfetch(wrap_proxy(url, alt))
-                if res.ok: return res
-            except: pass
-    
-    raise Exception(f"네트워크 오류 (모든 프록시 실패): {url[:50]}...")
+        raise Exception(f"HTTP {res.status}")
+    except Exception as e:
+        raise Exception(f"네트워크/CORS 오류: {final_url[:60]}... ({e})")
 
-async def check_hls_continuity(m3u8_url, max_segments, proxy_type):
+async def check_hls_continuity(m3u8_url, max_segments, proxy_prefix):
     log(f"[*] 분석 시작: {m3u8_url}", "header")
     
     try:
-        resp = await smart_fetch(m3u8_url, proxy_type)
+        resp = await fetch_with_proxy(m3u8_url, proxy_prefix)
         content = await resp.string()
         playlist = m3u8.loads(content, uri=m3u8_url)
     except Exception as e:
@@ -362,10 +348,10 @@ async def check_hls_continuity(m3u8_url, max_segments, proxy_type):
 
     if playlist.is_variant:
         log("[*] 마스터 플레이리스트 감지. 스트림 선택 중...", "info")
-        m3u8_url = playlist.playlists[0].absolute_uri
-        resp = await smart_fetch(m3u8_url, proxy_type)
+        media_url = playlist.playlists[0].absolute_uri
+        resp = await fetch_with_proxy(media_url, proxy_prefix)
         content = await resp.string()
-        playlist = m3u8.loads(content, uri=m3u8_url)
+        playlist = m3u8.loads(content, uri=media_url)
 
     segments = playlist.segments
     if not segments:
@@ -382,7 +368,7 @@ async def check_hls_continuity(m3u8_url, max_segments, proxy_type):
         log(f"Seg {i}: {seg.uri}", "header")
         
         try:
-            r = await smart_fetch(seg.absolute_uri, proxy_type)
+            r = await fetch_with_proxy(seg.absolute_uri, proxy_prefix)
             data = await r.bytes()
             ts = await window.parseSegmentTimestamps(Uint8Array.new(data).buffer)
             
