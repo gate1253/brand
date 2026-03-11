@@ -423,34 +423,157 @@
         async function analyzeSegment(url, index) {
             try {
                 const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
                 const buffer = await response.arrayBuffer();
                 const uint8 = new Uint8Array(buffer);
 
-                // Using mux.js to probe
-                const transmuxer = new muxjs.mp4.Transmuxer();
                 let videoDts = -1;
                 let audioDts = -1;
 
-                transmuxer.on('data', (data) => {
-                    if (data.type === 'video' && videoDts === -1) {
-                        videoDts = data.dts;
-                    } else if (data.type === 'audio' && audioDts === -1) {
-                        audioDts = data.dts;
-                    }
-                });
+                // 1. Detect format (TS or MP4)
+                const isTs = uint8[0] === 0x47; // TS Sync byte
+                const isMp4 = !isTs && (uint8.length > 8 && (
+                    uint8[4] === 0x66 && uint8[5] === 0x74 && uint8[6] === 0x79 && uint8[7] === 0x70 || // ftyp
+                    uint8[4] === 0x6d && uint8[5] === 0x6f && uint8[6] === 0x6f && uint8[7] === 0x66    // moof
+                ));
 
-                transmuxer.push(uint8);
-                transmuxer.flush();
+                if (isTs) {
+                    try {
+                        const packetStream = new muxjs.mp2t.TransportPacketStream();
+                        const parseStream = new muxjs.mp2t.TransportParseStream();
+                        packetStream.pipe(parseStream);
+                        
+                        parseStream.on('data', (data) => {
+                            if (data.type === 'pes') {
+                                const type = (data.streamType === 0x1b || data.streamType === 0x24 || data.streamType === 0x01 || data.streamType === 0x02) ? 'video' : 'audio';
+                                if (type === 'video' && videoDts === -1 && typeof data.dts !== 'undefined') videoDts = data.dts;
+                                else if (type === 'audio' && audioDts === -1 && typeof data.dts !== 'undefined') audioDts = data.dts;
+                            }
+                        });
+
+                        packetStream.push(uint8);
+                        packetStream.flush();
+
+                        // Fallback 1: Transmuxer
+                        if (videoDts === -1 && audioDts === -1) {
+                            const transmuxer = new muxjs.mp4.Transmuxer();
+                            transmuxer.on('data', (data) => {
+                                if (data.type === 'video' && videoDts === -1) videoDts = data.dts;
+                                else if (data.type === 'audio' && audioDts === -1) audioDts = data.dts;
+                            });
+                            transmuxer.push(uint8);
+                            transmuxer.flush();
+                        }
+
+                        // Fallback 2: Manual PES Analysis (Robust)
+                        if (videoDts === -1 && audioDts === -1) {
+                            const manual = extractDtsManual(uint8);
+                            videoDts = manual.videoDts;
+                            audioDts = manual.audioDts;
+                        }
+                    } catch (e) {
+                        console.error('TS parsing error:', e);
+                    }
+                } else if (isMp4) {
+                    // fMP4 extraction
+                    try {
+                        videoDts = muxjs.mp4.Probe.findFirstDts(uint8);
+                        if (videoDts === -1) {
+                            const transmuxer = new muxjs.mp4.Transmuxer();
+                            transmuxer.on('data', (data) => {
+                                if (data.type === 'video' && videoDts === -1) videoDts = data.dts;
+                            });
+                            transmuxer.push(uint8);
+                            transmuxer.flush();
+                        }
+                    } catch (e) {
+                        console.warn('MP4 Probe failed:', e);
+                    }
+                }
 
                 if (videoDts !== -1) logDts('video', index, videoDts);
                 if (audioDts !== -1) logDts('audio', index, audioDts);
+
+                if (videoDts === -1 && audioDts === -1) {
+                    const msg = isTs ? 'TS (No timing found)' : (isMp4 ? 'fMP4 (No timing found)' : 'Unknown Format');
+                    addStatusLog(index, msg);
+                }
 
                 state.totalSegments++;
                 elements.segCount.textContent = state.totalSegments;
 
             } catch (err) {
                 console.error(`Segment ${index} error:`, err);
+                addStatusLog(index, `Error: ${err.message}`, true);
             }
+        }
+
+        // TS 파일에서 직접 PES 헤더를 찾아 DTS를 추출하는 보조 함수
+        function extractDtsManual(uint8) {
+            let videoDts = -1;
+            let audioDts = -1;
+
+            for (let i = 0; i < uint8.length - 188; i += 188) {
+                if (uint8[i] !== 0x47) continue;
+
+                const hasPayload = uint8[i + 3] & 0x10;
+                const pusi = uint8[i + 1] & 0x40;
+
+                if (hasPayload && pusi) {
+                    let offset = 4;
+                    const hasAdaptation = uint8[i + 3] & 0x20;
+                    if (hasAdaptation) {
+                        offset += 1 + uint8[i + 4];
+                    }
+
+                    if (offset < 184 && 
+                        uint8[i + offset] === 0x00 && 
+                        uint8[i + offset + 1] === 0x00 && 
+                        uint8[i + offset + 2] === 0x01) {
+                        
+                        const streamId = uint8[i + offset + 3];
+                        const isVideo = streamId >= 0xE0 && streamId <= 0xEF;
+                        const isAudio = (streamId >= 0xC0 && streamId <= 0xDF) || (streamId >= 0xBD && streamId <= 0xBF);
+
+                        if ((isVideo && videoDts === -1) || (isAudio && audioDts === -1)) {
+                            const pesFlags = uint8[i + offset + 7];
+                            const hasPtsDts = (pesFlags & 0xC0) >> 6; // 2: PTS only, 3: PTS & DTS
+
+                            if (hasPtsDts >= 2) {
+                                let dtsOffset = offset + 9;
+                                if (hasPtsDts === 3) dtsOffset += 5; // Skip PTS to get DTS
+
+                                // TS PTS/DTS is 33 bits
+                                const b0 = uint8[i + dtsOffset];
+                                const b1 = uint8[i + dtsOffset + 1];
+                                const b2 = uint8[i + dtsOffset + 2];
+                                const b3 = uint8[i + dtsOffset + 3];
+                                const b4 = uint8[i + dtsOffset + 4];
+
+                                const dts = ((b0 & 0x0E) * Math.pow(2, 29)) +
+                                            (b1 * Math.pow(2, 22)) +
+                                            ((b2 & 0xFE) * Math.pow(2, 14)) +
+                                            (b3 * Math.pow(2, 7)) +
+                                            ((b4 & 0xFE) >> 1);
+
+                                if (isVideo) videoDts = dts;
+                                else audioDts = dts;
+                            }
+                        }
+                    }
+                }
+                if (videoDts !== -1 && audioDts !== -1) break;
+            }
+            return { videoDts, audioDts };
+        }
+
+        function addStatusLog(seq, msg, isError = false) {
+            const row = document.createElement('div');
+            row.className = 'log-entry' + (isError ? ' error' : '');
+            row.style.background = isError ? '#fce8e6' : '#f8f9fa';
+            row.innerHTML = `<div>#${seq}</div><div>-</div><div style="color: ${isError ? '#d93025' : '#888'}">${msg}</div>`;
+            elements.videoLog.insertBefore(row, elements.videoLog.children[1]);
         }
 
 
