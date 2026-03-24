@@ -8,6 +8,14 @@ class WebRTCManager {
         this.remoteStreams = new Map(); // sessionId -> MediaStream
         this.pendingRemoteTracks = [];
         this.isRenegotiating = false;
+        this.negotiationQueue = false;
+    }
+
+    getTrackName(track) {
+        if (!track) return 'video';
+        if (track.kind === 'audio') return 'audio';
+        if (this.app.mediaManager.screenStream && this.app.mediaManager.screenStream.getVideoTracks().includes(track)) return 'screen';
+        return 'video';
     }
 
     async init(localStream) {
@@ -47,12 +55,7 @@ class WebRTCManager {
             
             this.pc.getTransceivers().forEach(t => {
                  if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
-                     let trackName = 'video';
-                     if (t.sender.track) {
-                         if (t.sender.track.kind === 'audio') trackName = 'audio';
-                         else if (this.app.mediaManager.screenStream && this.app.mediaManager.screenStream.getVideoTracks().includes(t.sender.track)) trackName = 'screen';
-                         else trackName = 'video';
-                     }
+                     const trackName = this.getTrackName(t.sender.track);
                      tracks.push({ location: 'local', mid: t.mid, trackName });
                      localTracksInfo.push({ trackName, mid: t.mid });
                      this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
@@ -66,6 +69,7 @@ class WebRTCManager {
             
             const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionDescription, tracks })
             });
             
@@ -114,9 +118,7 @@ class WebRTCManager {
         const localTracksInfo = [];
         this.pc.getTransceivers().forEach(t => {
             if ((t.direction === 'sendonly' || t.direction === 'sendrecv') && t.sender.track) {
-                let trackName = 'video';
-                if (t.sender.track.kind === 'audio') trackName = 'audio';
-                else if (this.app.mediaManager.screenStream && this.app.mediaManager.screenStream.getVideoTracks().includes(t.sender.track)) trackName = 'screen';
+                const trackName = this.getTrackName(t.sender.track);
                 localTracksInfo.push({ trackName, mid: t.mid });
             }
         });
@@ -141,6 +143,7 @@ class WebRTCManager {
         try {
             const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tracks: tracksToProcess.map(t => ({
                         location: 'remote', sessionId: t.sessionId, trackName: t.trackName
@@ -168,6 +171,7 @@ class WebRTCManager {
                 
                 await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
                     })
@@ -224,6 +228,7 @@ class WebRTCManager {
             const mapped = this.transceiversMap.get(t.mid);
             if (mapped && mapped.sessionId === sid) {
                 t.direction = 'inactive';
+                if (t.sender) t.sender.replaceTrack(null);
                 this.transceiversMap.delete(t.mid);
             }
         });
