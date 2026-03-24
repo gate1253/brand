@@ -34,15 +34,24 @@ class UIManager {
         };
 
         this.toggleScreenBtn.onclick = async () => {
-            const { active } = await this.app.mediaManager.toggleScreen();
+            const { active, stream } = await this.app.mediaManager.toggleScreen();
             
             if (!active) {
                 this.toggleScreenBtn.classList.remove('active');
                 this.app.webrtcManager.stopScreenTransceiver();
+                
+                // Remove local preview
+                const localScreenContainer = document.getElementById('container-local-screen');
+                if (localScreenContainer) localScreenContainer.remove();
+
                 await this.app.webrtcManager.renegotiate();
             } else {
                 this.toggleScreenBtn.classList.add('active');
-                this.app.webrtcManager.pc.addTransceiver(this.app.mediaManager.screenStream.getVideoTracks()[0], { direction: 'sendonly' });
+                
+                // Add local preview
+                this.renderLocalScreenPreview(stream);
+
+                this.app.webrtcManager.pc.addTransceiver(stream.getVideoTracks()[0], { direction: 'sendonly' });
                 await this.app.webrtcManager.renegotiate();
             }
         };
@@ -95,6 +104,24 @@ class UIManager {
 
     updateLocalVideo(track) {
         this.localVideo.srcObject = new MediaStream([track]);
+    }
+
+    renderLocalScreenPreview(stream) {
+        let container = document.getElementById('container-local-screen');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'container-local-screen';
+            container.className = 'video-container screen-share-mode';
+            container.innerHTML = `
+                <video id="localScreenVideo" autoplay playsinline muted></video>
+                <div class="label">My Screen Share (Preview)</div>`;
+            this.videoGrid.appendChild(container);
+        }
+        
+        const video = document.getElementById('localScreenVideo');
+        if (video) {
+            video.srcObject = stream;
+        }
     }
 
     createVideoContainer(sessionId, isScreen) {
