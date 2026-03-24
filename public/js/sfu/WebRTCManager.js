@@ -1,0 +1,261 @@
+class WebRTCManager {
+    constructor(app, apiUrl) {
+        this.app = app;
+        this.apiUrl = apiUrl;
+        this.pc = null;
+        this.transceiversMap = new Map();
+        this.subscribedTracks = new Set();
+        this.remoteStreams = new Map(); // sessionId -> MediaStream
+        this.pendingRemoteTracks = [];
+        this.isRenegotiating = false;
+    }
+
+    async init(localStream) {
+        this.pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+            bundlePolicy: 'max-bundle'
+        });
+
+        this.pc.ontrack = (event) => {
+            const mid = event.transceiver.mid;
+            const info = this.transceiversMap.get(mid);
+            console.info('[WebRTCManager] pc.ontrack:', mid, info, event.track.kind);
+            if (info && info.location === 'remote') {
+                this.app.uiManager.setupRemoteVideo(info, event.track, this.remoteStreams);
+            }
+        };
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                this.pc.addTransceiver(track, { direction: 'sendonly' });
+            });
+        }
+    }
+
+    async renegotiate() {
+        const callsSessionId = this.app.callsSessionId;
+        if (!this.pc || !callsSessionId || this.isRenegotiating) return;
+        
+        this.isRenegotiating = true;
+        try {
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+            
+            const sessionDescription = this.pc.localDescription;
+            const tracks = [];
+            const localTracksInfo = [];
+            
+            this.pc.getTransceivers().forEach(t => {
+                 if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
+                     let trackName = 'video';
+                     if (t.sender.track) {
+                         if (t.sender.track.kind === 'audio') trackName = 'audio';
+                         else if (this.app.mediaManager.screenStream && this.app.mediaManager.screenStream.getVideoTracks().includes(t.sender.track)) trackName = 'screen';
+                         else trackName = 'video';
+                     }
+                     tracks.push({ location: 'local', mid: t.mid, trackName });
+                     localTracksInfo.push({ trackName, mid: t.mid });
+                     this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
+                 } else if (t.direction === 'recvonly') {
+                     const mapped = this.transceiversMap.get(t.mid);
+                     if (mapped && mapped.location === 'remote') {
+                         tracks.push({ location: 'remote', sessionId: mapped.sessionId, trackName: mapped.trackName });
+                     }
+                 }
+            });
+            
+            const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
+                method: 'POST',
+                body: JSON.stringify({ sessionDescription, tracks })
+            });
+            
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.errorDescription || 'Renegotiation failed');
+    
+            if (data.tracks) {
+                data.tracks.forEach(t => {
+                    if (t.mid) {
+                        this.transceiversMap.set(t.mid, { 
+                            location: t.location || 'remote', 
+                            sessionId: t.sessionId, 
+                            trackName: t.trackName 
+                        });
+                    }
+                });
+            }
+
+            const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
+            const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
+            await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+
+            if (this.app.signalingClient && this.app.signalingClient.isOpen()) {
+                console.info('[WebRTCManager] Sending tracks-update after renegotiate');
+                this.app.signalingClient.send({ 
+                    type: 'tracks-update', 
+                    sessionId: callsSessionId, 
+                    clientId: callsSessionId, 
+                    tracks: localTracksInfo, 
+                    room: this.app.targetCode 
+                });
+            }
+        } catch (e) {
+            console.error("[WebRTCManager] Renegotiate Error:", e);
+        } finally {
+            this.isRenegotiating = false;
+            if (this.pendingRemoteTracks.length > 0) setTimeout(() => this.processPendingTracks(), 100);
+        }
+    }
+
+    broadcastLocalTracks() {
+        const callsSessionId = this.app.callsSessionId;
+        if (!this.pc || !this.app.signalingClient || !this.app.signalingClient.isOpen()) return;
+        
+        console.info('[WebRTCManager] Broadcasting local tracks');
+        const localTracksInfo = [];
+        this.pc.getTransceivers().forEach(t => {
+            if ((t.direction === 'sendonly' || t.direction === 'sendrecv') && t.sender.track) {
+                let trackName = 'video';
+                if (t.sender.track.kind === 'audio') trackName = 'audio';
+                else if (this.app.mediaManager.screenStream && this.app.mediaManager.screenStream.getVideoTracks().includes(t.sender.track)) trackName = 'screen';
+                localTracksInfo.push({ trackName, mid: t.mid });
+            }
+        });
+        
+        this.app.signalingClient.send({ 
+            type: 'tracks-update', 
+            sessionId: callsSessionId, 
+            clientId: callsSessionId, 
+            tracks: localTracksInfo, 
+            room: this.app.targetCode 
+        });
+    }
+
+    async processPendingTracks() {
+        const callsSessionId = this.app.callsSessionId;
+        if (!this.pc || !callsSessionId || this.isRenegotiating || this.pendingRemoteTracks.length === 0) return;
+        
+        this.isRenegotiating = true;
+        const tracksToProcess = [...this.pendingRemoteTracks];
+        this.pendingRemoteTracks = [];
+        
+        try {
+            const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    tracks: tracksToProcess.map(t => ({
+                        location: 'remote', sessionId: t.sessionId, trackName: t.trackName
+                    }))
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.errorDescription || 'Subscription failed');
+
+            if (data.sessionDescription && data.sessionDescription.type === 'offer') {
+                if (data.tracks) {
+                    data.tracks.forEach(t => {
+                        if (t.mid) {
+                            this.transceiversMap.set(t.mid, { 
+                                location: t.location || 'remote', sessionId: t.sessionId, trackName: t.trackName 
+                            });
+                            this.subscribedTracks.add(t.sessionId + ':' + t.trackName);
+                        }
+                    });
+                }
+
+                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sessionDescription));
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                
+                await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
+                    })
+                });
+            }
+        } catch (e) {
+            console.error('[WebRTCManager] Subscription Error:', e);
+            this.pendingRemoteTracks = [...tracksToProcess, ...this.pendingRemoteTracks];
+        } finally {
+            this.isRenegotiating = false;
+            if (this.pendingRemoteTracks.length > 0) setTimeout(() => this.processPendingTracks(), 500);
+        }
+    }
+
+    handleRemoteTracksUpdate(msg) {
+        const sid = msg.sessionId || msg.clientId;
+        if (!sid) return;
+        console.info('[WebRTCManager] handleRemoteTracksUpdate from:', sid);
+        const currentRemoteTracks = new Set(msg.tracks.map(t => sid + ':' + t.trackName));
+        
+        msg.tracks.forEach(t => {
+            const key = sid + ':' + t.trackName;
+            if (!this.subscribedTracks.has(key)) {
+                if (!this.pendingRemoteTracks.some(p => p.sessionId === sid && p.trackName === t.trackName)) {
+                    this.pendingRemoteTracks.push({ sessionId: sid, trackName: t.trackName });
+                }
+            }
+        });
+
+        for (let key of this.subscribedTracks) {
+            if (key.startsWith(sid + ':') && !currentRemoteTracks.has(key)) {
+                this.subscribedTracks.delete(key);
+                const trackName = key.split(':')[1];
+                this.app.uiManager.removeRemoteTrackUI(sid, trackName, this.remoteStreams, this.subscribedTracks, this.pc, this.transceiversMap);
+            }
+        }
+
+        if (this.pendingRemoteTracks.length > 0) this.processPendingTracks();
+    }
+
+    handleRemoteLeave(msg) {
+        const sid = msg.sessionId || msg.clientId;
+        if (!sid) return;
+        console.info('[WebRTCManager] handleRemoteLeave from:', sid);
+        for (let key of Array.from(this.subscribedTracks)) {
+            if (key.startsWith(sid + ':')) {
+                this.subscribedTracks.delete(key);
+            }
+        }
+        
+        this.app.uiManager.removeAllRemoteContainers(sid, this.remoteStreams);
+        
+        this.pc.getTransceivers().forEach(t => {
+            const mapped = this.transceiversMap.get(t.mid);
+            if (mapped && mapped.sessionId === sid) {
+                t.direction = 'inactive';
+                this.transceiversMap.delete(t.mid);
+            }
+        });
+    }
+
+    replaceVideoTrack(newTrack) {
+        if (!this.pc) return;
+        this.pc.getTransceivers().forEach(t => {
+            const info = this.transceiversMap.get(t.mid);
+            if (info && info.location === 'local' && info.trackName === 'video') {
+                t.sender.replaceTrack(newTrack);
+            }
+        });
+        this.app.uiManager.updateLocalVideo(newTrack);
+    }
+    
+    stopScreenTransceiver() {
+        this.pc.getTransceivers().forEach(t => {
+            const mapped = this.transceiversMap.get(t.mid);
+            if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
+                t.direction = 'inactive';
+                t.sender.replaceTrack(null);
+            }
+        });
+    }
+
+    close() {
+        if (this.pc) {
+            this.pc.close();
+            this.pc = null;
+        }
+    }
+}
+
+window.WebRTCManager = WebRTCManager;
