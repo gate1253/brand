@@ -6,12 +6,9 @@
 	<meta name="viewport" content="width=device-width,initial-scale=1" />
 	<title>GATE1253</title>
 	<style>
-		/* 추가: 로딩 스피너 스타일 */
 		.loader {
 			border: 2px solid #f3f3f3;
-			/* Light grey */
 			border-top: 2px solid #3498db;
-			/* Blue */
 			border-radius: 50%;
 			width: 16px;
 			height: 16px;
@@ -19,52 +16,39 @@
 		}
 
 		@keyframes spin {
-			0% {
-				transform: rotate(0deg);
-			}
-
-			100% {
-				transform: rotate(360deg);
-			}
+			0% { transform: rotate(0deg); }
+			100% { transform: rotate(360deg); }
 		}
 	</style>
 	<link rel="stylesheet" href="assets/style.css" />
 </head>
 
 <body>
-	<!-- 추가: 우측 상단 고정 Support 링크 -->
 	<a class="top-right-support" href="/support/" title="지원 페이지 열기" aria-label="지원 페이지">Support</a>
-	<!-- 추가: 좌측 상단 네비게이션 컨테이너 -->
+
 	<div class="top-left-nav">
-		<!-- 추가: 우측 상단 Intro MP4 링크 -->
 		<a class="top-right-intro" href="/support/intro.mp4" title="소개 영상 열기" aria-label="소개 영상">Intro</a>
-		<!-- 추가: 우측 상단 presentation.pdf 링크 -->
 		<a class="top-right-doc" href="/support/presentation.pdf" target="_blank" rel="noopener noreferrer"
 			title="프레젠테이션 PDF 열기" aria-label="프레젠테이션 PDF">Presentation</a>
-		<!-- 추가: 좌측 상단 Info 버튼 -->
 		<button id="info-btn" class="top-right-info-btn hidden" title="설명 정보 열기" aria-label="설명 정보">Info</button>
 	</div>
-	<!-- 변경: 로그인/로그아웃 버튼을 위한 동적 컨테이너에 스타일 클래스 추가 -->
+
 	<div id="auth-container" class="auth-widget"></div>
 
 	<main class="container" role="main">
-		<!-- 중앙 정렬된 로고 + 간단 설명 -->
 		<div class="brand" role="banner">
 			<img id="logo-img" class="logo" src="assets/images/logo-r3.jpg" alt="R3">
-			<div class="service-toggle" style="margin-bottom: 16px; display: flex; gap: 8px;">
+			<div class="service-toggle">
 				<a id="r1-btn" class="service-toggle-btn hidden" href="#" title="R1" aria-label="R1">R1</a>
 				<a id="r2-btn" class="service-toggle-btn hidden" href="#" title="R2" aria-label="R2">R2</a>
 				<a id="r5-btn" class="service-toggle-btn hidden" href="#" title="R5" aria-label="R5">R5</a>
 				<a id="r3-btn" class="service-toggle-btn active" href="#" title="R3" aria-label="R3">R3</a>
 			</div>
-			<p id="lead-text" class="lead" style="margin-top:0">간단하고 빠른 단축 URL 생성 서비스</p>
+			<p id="lead-text" class="lead">간단하고 빠른 단축 URL 생성 서비스</p>
 		</div>
 
-		<!-- 중앙 검색(단축) 박스 -->
 		<section aria-labelledby="shorten-heading">
-			<h2 id="shorten-heading"
-				style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">단축 URL 생성</h2>
-			<!-- 입력 필드들을 감싸는 부모 컨테이너 추가 -->
+			<h2 id="shorten-heading" class="sr-only">단축 URL 생성</h2>
 			<div id="search-wrap" class="search-wrap">
 				<form class="search-box"
 					onsubmit="event.preventDefault(); document.getElementById('shorten-btn').click();">
@@ -76,30 +60,24 @@
 					</button>
 				</form>
 
-				<!-- 추가: 로그인 시 커스텀 코드 입력 필드 -->
 				<div id="alias-input-container" class="search-box alias-box hidden">
-					<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드"
-						style="flex:1;border:none;outline:none;padding:8px;background:transparent;">
+					<input id="alias-input" type="text" placeholder="커스텀 코드 (선택 사항)" aria-label="커스텀 코드">
 				</div>
 
-				<!-- R1 전용: 만료일 설정 필드 -->
 				<div id="expiration-input-container" class="search-box alias-box hidden">
-					<input id="expiration-input" type="text" placeholder="만료일" aria-label="만료일"
-						style="flex:1;border:none;outline:none;padding:8px;background:transparent;font-size:16px;color:#333;">
-					<label
-						style="display:flex; align-items:center; gap:5px; font-size: 14px; color: #555; cursor: pointer; white-space: nowrap;">
+					<input id="expiration-input" type="text" placeholder="만료일" aria-label="만료일">
+					<label class="utc-label">
 						<input type="checkbox" id="utc-checkbox"> UTC
 					</label>
 				</div>
 			</div>
-			<!-- 결과는 입력폼 영역이 대체하여 표시됩니다 (result-box 삭제) -->
 			<p id="custom-code-note" class="note" style="text-align:center;margin:8px 0 0">비회원은 커스텀 코드를 제공할 수 없습니다. 커스텀
 				코드가 필요하면 회원으로 로그인하세요.</p>
-			<div id="msg" class="status" role="status" aria-live="polite" style="text-align:center"></div>
+			<div id="msg" class="status" role="status" aria-live="polite"></div>
 		</section>
 	</main>
 
-	<!-- 추가: API 키 모달 -->
+	<!-- 모달: 계정 정보 -->
 	<div id="api-key-modal" class="modal-overlay hidden">
 		<div class="modal-content">
 			<button class="modal-close-btn" id="modal-close-btn">&times;</button>
@@ -126,18 +104,16 @@
 		</div>
 	</div>
 
-	<!-- 추가: R1/R2 설명 모달 -->
+	<!-- 모달: R1/R2 설명 -->
 	<div id="info-modal" class="modal-overlay hidden">
 		<div class="modal-content">
 			<button class="modal-close-btn" id="info-modal-close-btn">&times;</button>
 			<h2 id="info-modal-title">Service Info</h2>
-			<div id="info-modal-body" class="info-content">
-				<!-- 동적으로 내용이 채워집니다 -->
-			</div>
+			<div id="info-modal-body" class="info-content"></div>
 		</div>
 	</div>
 
-	<!-- 추가: 비디오 모달 -->
+	<!-- 모달: 비디오 -->
 	<div id="video-modal" class="modal-overlay hidden">
 		<div class="modal-content">
 			<button class="close-button" id="close-video-modal">&times;</button>
@@ -146,219 +122,7 @@
 	</div>
 
 	<script src="/member/auth.js" defer></script>
-	<script src="assets/app.js" defer></script>
-	<script src="assets/script.js" defer></script>
-	<script>
-		// 추가: 로그인 상태에 따라 UI를 동적으로 변경하는 스크립트
-		function updateUIForUser(user) {
-			const authContainer = document.getElementById('auth-container');
-			const r1Btn = document.getElementById('r1-btn');
-			const r2Btn = document.getElementById('r2-btn');
-			const r5Btn = document.getElementById('r5-btn');
-
-			const aliasInputContainer = document.getElementById('alias-input-container');
-			const expirationInputContainer = document.getElementById('expiration-input-container');
-			const customCodeNote = document.getElementById('custom-code-note');
-
-			if (user) {
-				r1Btn.classList.remove('hidden');
-				r2Btn.classList.remove('hidden');
-				r5Btn.classList.remove('hidden');
-				const userName = user.name || 'User profile';
-				authContainer.innerHTML = `
-					${user.picture ? `<img src="${user.picture}" alt="${userName}" class="profile-picture clickable" id="profile-picture">` : ''}
-					<button id="logout-btn" class="auth-button" type="button">Logout</button>
-				`;
-				document.getElementById('logout-btn').addEventListener('click', () => {
-					window.logout();
-				});
-
-				if (r1Btn.classList.contains('active')) {
-					expirationInputContainer.classList.remove('hidden');
-					aliasInputContainer.classList.add('hidden');
-				} else {
-					aliasInputContainer.classList.remove('hidden');
-					expirationInputContainer.classList.add('hidden');
-				}
-				updateInfoBtnVisibility();
-				customCodeNote.style.display = 'none';
-
-				const profilePicture = document.getElementById('profile-picture');
-				if (profilePicture) {
-					profilePicture.addEventListener('click', () => {
-						const apiKeyModal = document.getElementById('api-key-modal');
-						const displayApiKey = document.getElementById('display-api-key');
-						const displayUniqueUserId = document.getElementById('display-unique-user-id');
-						const modalMessage = document.getElementById('modal-message');
-
-						displayApiKey.textContent = user.apiKey;
-						displayUniqueUserId.textContent = user.uniqueUserId;
-						modalMessage.textContent = '';
-						apiKeyModal.classList.remove('hidden');
-					});
-				}
-			} else {
-				authContainer.innerHTML = `<a class="auth-button" href="/member/login.html">Login</a>`;
-				aliasInputContainer.classList.add('hidden');
-				expirationInputContainer.classList.add('hidden');
-				updateInfoBtnVisibility();
-				customCodeNote.style.display = 'block';
-			}
-		}
-
-		// 추가: Info 버튼 가시성 업데이트 함수 (Global)
-		function updateInfoBtnVisibility() {
-			const user = window.user || window.getCurrentUser();
-			const infoBtn = document.getElementById('info-btn');
-			const r1Btn = document.getElementById('r1-btn');
-			const r2Btn = document.getElementById('r2-btn');
-
-			if (user && infoBtn && r1Btn && r2Btn && (r1Btn.classList.contains('active') || r2Btn.classList.contains('active'))) {
-				infoBtn.classList.remove('hidden');
-			} else if (infoBtn) {
-				infoBtn.classList.add('hidden');
-			}
-		}
-
-		document.addEventListener('DOMContentLoaded', () => {
-			const r1Btn = document.getElementById('r1-btn');
-			const r2Btn = document.getElementById('r2-btn');
-			const r3Btn = document.getElementById('r3-btn');
-			const r5Btn = document.getElementById('r5-btn');
-			const aliasInputContainer = document.getElementById('alias-input-container');
-			const expirationInputContainer = document.getElementById('expiration-input-container');
-			const logoImg = document.getElementById('logo-img');
-			const leadText = document.getElementById('lead-text');
-			const urlParams = new URLSearchParams(window.location.search);
-			let user;
-
-			if (urlParams.get('testuser') === '1') {
-				user = {
-					name: 'Test User',
-					picture: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
-					apiKey: 'test-api-key-for-viewing-123',
-					uniqueUserId: 'test-user-id-for-viewing-456'
-				};
-			} else {
-				user = window.getCurrentUser();
-			}
-
-			window.user = user;
-			updateUIForUser(user);
-
-			document.getElementById('modal-close-btn').addEventListener('click', () => {
-				document.getElementById('api-key-modal').classList.add('hidden');
-			});
-
-			document.getElementById('copy-api-key-btn').addEventListener('click', async () => {
-				const apiKey = document.getElementById('display-api-key').textContent;
-				const modalMessage = document.getElementById('modal-message');
-				try {
-					await navigator.clipboard.writeText(apiKey);
-					modalMessage.textContent = 'API 키가 클립보드에 복사되었습니다.';
-				} catch (err) {
-					modalMessage.textContent = 'API 키 복사 실패.';
-				}
-			});
-
-			document.getElementById('copy-user-id-btn').addEventListener('click', async () => {
-				const uniqueUserId = document.getElementById('display-unique-user-id').textContent;
-				const modalMessage = document.getElementById('modal-message');
-				try {
-					await navigator.clipboard.writeText(uniqueUserId);
-					modalMessage.textContent = '고유 사용자 ID가 클립보드에 복사되었습니다.';
-				} catch (err) {
-					modalMessage.textContent = '고유 사용자 ID 복사 실패.';
-				}
-			});
-
-			// 서비스 전환 핸들러 통합 관리
-			const setMode = (mode) => {
-				[r1Btn, r2Btn, r3Btn, r5Btn].forEach(btn => btn.classList.remove('active'));
-				document.getElementById(`${mode.toLowerCase()}-btn`).classList.add('active');
-
-				if (mode === 'R1') {
-					logoImg.src = 'assets/images/logo-r1.jpg';
-					logoImg.alt = 'R1';
-					leadText.textContent = '간단하고 빠른 One Time URL 생성 서비스';
-					if (user) { expirationInputContainer.classList.remove('hidden'); aliasInputContainer.classList.add('hidden'); }
-				} else if (mode === 'R2') {
-					logoImg.src = 'assets/images/logo-r2.jpg';
-					logoImg.alt = 'R2';
-					leadText.textContent = '원본 URL 노출을 막아주는 안전한 단축 URL 서비스';
-					if (user) { aliasInputContainer.classList.remove('hidden'); expirationInputContainer.classList.add('hidden'); }
-				} else if (mode === 'R3') {
-					logoImg.src = 'assets/images/logo-r3.jpg';
-					logoImg.alt = 'R3';
-					leadText.textContent = '간단하고 빠른 단축 URL 생성 서비스';
-					if (user) { aliasInputContainer.classList.remove('hidden'); expirationInputContainer.classList.add('hidden'); }
-				} else if (mode === 'R5') {
-					logoImg.src = 'assets/images/logo-r5.jpg';
-					logoImg.alt = 'R5';
-					leadText.textContent = '대용량 파일 서비스에 적합한 단축 URL 생성 서비스';
-					if (user) { aliasInputContainer.classList.remove('hidden'); expirationInputContainer.classList.add('hidden'); }
-				}
-				updateInfoBtnVisibility();
-			};
-
-			r1Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R1'); });
-			r2Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R2'); });
-			r3Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R3'); });
-			r5Btn.addEventListener('click', (e) => { e.preventDefault(); setMode('R5'); });
-
-			const introLink = document.querySelector('.top-right-intro');
-			const videoModal = document.getElementById('video-modal');
-			const closeVideoModal = document.getElementById('close-video-modal');
-			const videoContainer = document.getElementById('video-container');
-
-			function openIntroVideo() {
-				const videoUrl = introLink.getAttribute('href');
-				videoContainer.innerHTML = `<video style="display: block; width: 100%; height: 100%;" controls autoplay playsinline muted><source src="${videoUrl}" type="video/mp4"></video>`;
-				videoModal.classList.remove('hidden');
-			}
-
-			introLink.addEventListener('click', (e) => { e.preventDefault(); openIntroVideo(); });
-			if (!localStorage.getItem('hasSeenIntro')) { openIntroVideo(); localStorage.setItem('hasSeenIntro', 'true'); }
-			closeVideoModal.addEventListener('click', () => { videoModal.classList.add('hidden'); videoContainer.innerHTML = ''; });
-			videoModal.addEventListener('click', (e) => { if (e.target === videoModal) { videoModal.classList.add('hidden'); videoContainer.innerHTML = ''; } });
-
-			const expirationInput = document.getElementById('expiration-input');
-			expirationInput.addEventListener('focus', function () { this.type = 'datetime-local'; this.placeholder = ''; });
-			expirationInput.addEventListener('blur', function () { if (!this.value) { this.type = 'text'; this.placeholder = '만료일'; } });
-
-			const infoBtn = document.getElementById('info-btn');
-			const infoModal = document.getElementById('info-modal');
-			const infoModalCloseBtn = document.getElementById('info-modal-close-btn');
-			const infoModalTitle = document.getElementById('info-modal-title');
-			const infoModalBody = document.getElementById('info-modal-body');
-
-			infoBtn.addEventListener('click', () => {
-				if (r1Btn.classList.contains('active')) {
-					infoModalTitle.textContent = "R1 Service Description";
-					infoModalBody.innerHTML = `
-						<table class="info-table">
-							<tr><th>항목</th><th>설명</th></tr>
-							<tr><td><strong>404 대체 이미지</strong></td><td><code>404={http image address}</code></td></tr>
-							<tr><td colspan="2" class="hint">* 만료 후에는 해당 이미지로 대체 됩니다.</td></tr>
-						</table>`;
-				} else if (r2Btn.classList.contains('active')) {
-					infoModalTitle.textContent = "R2 Service Description";
-					infoModalBody.innerHTML = `
-						<table class="info-table">
-							<tr><th>항목</th><th>파라미터 (Query String)</th><th>서버 주소</th></tr>
-							<tr><td><strong>채팅</strong></td><td><code>with=websocket&type=html</code></td><td>wss://chat.gate1253.kro.kr</td></tr>
-							<tr><td><strong>화상채팅</strong></td><td><code>with=webrtc&type=html</code></td><td>wss://chat.gate1253.kro.kr 또는 <br>https://webrtc.gate1253.workers.dev</td></tr>
-							<tr><td><strong>플레이어</strong></td><td><code>with=player&type=html</code></td><td>'{MP4|M3U8}' 파일 주소</td></tr>
-							<tr><td><strong>쿼리스트링</strong></td><td><code>with=querystring&type=forward</code></td><td>호출 시 쿼리스트링을 원본으로 전달</td></tr>
-						</table>`;
-				}
-				infoModal.classList.remove('hidden');
-			});
-
-			infoModalCloseBtn.addEventListener('click', () => infoModal.classList.add('hidden'));
-			infoModal.addEventListener('click', (e) => { if (e.target === infoModal) infoModal.classList.add('hidden'); });
-		});
-	</script>
+	<script src="assets/main.js" defer></script>
 </body>
 
 </html>
