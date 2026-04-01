@@ -17,7 +17,7 @@ class TranscriptionManager {
         this.workletNode = null;
         this.audioInputBuffer = [];
         this.subTimeout = null;
-        this.BUFFER_SECONDS = 30;
+        this.BUFFER_SECONDS = 5;
         this.TARGET_SAMPLE_RATE = 16000;
 
         this.subtitleOverlay = document.getElementById('subtitleOverlay');
