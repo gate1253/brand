@@ -70,7 +70,7 @@ body {
 	}
 
 	.container {
-		padding: 16px
+		padding: 30px 8px 10px 8px;
 	}
 
 	.brand .title {
@@ -84,12 +84,20 @@ body {
 
 /* 검색창 스타일 (중앙 큰 박스) */
 .search-wrap {
-	width: 100%;
-	max-width: 800px;
+	width: 50vw; /* 화면 사이즈 절반 차지 */
+	min-width: 600px; /* 너무 줄어드는 것 방지 */
+	max-width: 1600px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 12px;
+}
+
+@media(max-width: 900px) {
+	.search-wrap {
+		width: 100%;
+		min-width: auto;
+	}
 }
 
 .search-box,
@@ -228,9 +236,9 @@ body {
 @media(max-width:560px) {
 	.search-box,
 	.alias-box {
-		flex-direction: column;
-		border-radius: 16px;
-		padding: 12px;
+		flex-direction: row;
+		border-radius: 999px;
+		padding: 6px 6px 6px 12px;
 		gap: 8px;
 	}
 
@@ -239,26 +247,29 @@ body {
 	.alias-box #alias-input,
 	.alias-box #expiration-input {
 		width: 100%;
-		font-size: 16px;
+		font-size: 14px;
 	}
 
 	.search-box #shorten-btn,
 	.search-box .btn {
-		width: 100%;
-		padding: 12px;
-		border-radius: 12px;
+		width: auto;
+		padding: 8px 16px;
+		border-radius: 999px;
+		height: 36px;
 	}
 }
 
 /* 추가: 좌측 상단 네비게이션 컨테이너 */
-.top-left-nav {
-	position: fixed;
-	top: 16px;
-	left: 16px;
-	z-index: 1000;
-	display: flex;
-	align-items: center;
-	gap: 8px;
+@media (min-width: 561px) {
+	.top-left-nav {
+		position: fixed;
+		top: 16px;
+		left: 16px;
+		z-index: 1000;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
 }
 
 /* 상단 우측 고정 Presentation 링크 */
@@ -351,38 +362,69 @@ body {
 }
 
 @media (max-width: 560px) {
+	.top-left-nav,
+	.auth-widget,
+	.top-right-support {
+		position: absolute;
+		top: 10px;
+		margin: 0;
+		display: flex;
+		align-items: center;
+		flex-wrap: nowrap;
+		white-space: nowrap;
+	}
+
 	.top-left-nav {
-		flex-direction: column;
-		align-items: flex-start;
-		top: 60px;
+		left: 10px;
+		gap: 6px;
+	}
+
+	.auth-widget {
+		right: 10px;
+		gap: 6px;
+	}
+
+	.top-right-support {
+		display: inline-flex;
+		left: 50%;
+		transform: translateX(-50%);
+	}
+
+	.top-right-doc,
+	.top-right-intro,
+	.top-right-info-btn,
+	.auth-button {
+		padding: 6px 8px !important;
+		font-size: 11px !important;
+	}
+
+	.profile-picture {
+		width: 24px;
+		height: 24px;
 	}
 }
 
 /* 상단 우측 고정 링크 요소 */
-.top-right-support {
-	position: fixed;
-	top: 16px;
-	right: 16px;
-	/* 가장 오른쪽 상단으로 이동 */
-	left: unset;
-	/* left 속성 제거 */
-	z-index: 1000;
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	padding: 8px 12px;
-	border-radius: 999px;
-	background: #f8f9fa;
-	/* 변경: 배경색 */
-	color: #5f6368;
-	/* 변경: 글자색 */
-	border: 1px solid #dadce0;
-	/* 변경: 테두리색 */
-	text-decoration: none;
-	font-weight: 600;
-	font-size: 13px;
-	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-	/* 변경: 그림자 */
+@media (min-width: 561px) {
+	.top-right-support {
+		position: fixed;
+		top: 16px;
+		right: 16px;
+		left: unset;
+		z-index: 1000;
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 12px;
+		border-radius: 999px;
+		background: #f8f9fa;
+		color: #5f6368;
+		border: 1px solid #dadce0;
+		text-decoration: none;
+		font-weight: 600;
+		font-size: 13px;
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+	}
 }
 
 .top-right-support:hover,
@@ -397,16 +439,16 @@ body {
 }
 
 /* 변경: 로그인 위젯 컨테이너 (우측 상단 고정) */
-.auth-widget {
-	position: fixed;
-	top: 16px;
-	right: 100px;
-	/* Support 버튼의 왼쪽에 배치 */
-	z-index: 1000;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	/* 프로필 사진과 로그아웃 버튼 사이 간격 증가 */
+@media (min-width: 561px) {
+	.auth-widget {
+		position: fixed;
+		top: 16px;
+		right: 100px;
+		z-index: 1000;
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
 }
 
 /* 추가: 프로필 사진 스타일 */
@@ -600,9 +642,20 @@ body {
 .info-table th:first-child,
 .info-table td:first-child {
 	white-space: nowrap !important;
-	width: 1% !important;
-	padding-right: 20px !important;
+	width: auto !important;
+	padding-right: 15px !important;
 	text-align: left !important;
+}
+
+@media (max-width: 560px) {
+	.info-content {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+	.info-table {
+		min-width: 450px; /* Ensure content is readable via scrolling */
+		font-size: 13px;
+	}
 }
 
 .info-table th,
