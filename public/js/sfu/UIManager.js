@@ -160,39 +160,56 @@ class UIManager {
     }
 
     setupRemoteVideo(info, track, remoteStreamsMap) {
-        console.info('[UIManager] setupRemoteVideo:', info.sessionId, info.trackName);
+        if (!info || !info.sessionId || !info.trackName) {
+            console.error('[UIManager] setupRemoteVideo: mapping failure — missing info', {
+                info, trackId: track ? track.id : null, trackKind: track ? track.kind : null
+            });
+            return;
+        }
+
+        const isScreen = info.trackName === 'screen';
+        console.info('[UIManager] setupRemoteVideo:', info.sessionId, info.trackName, 'isScreen:', isScreen, 'trackKind:', track.kind);
+
         let containerId = 'container-' + info.sessionId;
-        if (info.trackName === 'screen') containerId += '-screen';
-        
+        if (isScreen) containerId += '-screen';
+
         let container = document.getElementById(containerId);
         if (!container) {
-             container = this.createVideoContainer(info.sessionId, info.trackName === 'screen');
+            container = this.createVideoContainer(info.sessionId, isScreen);
         }
-        
-        const videoId = 'video-' + info.sessionId + (info.trackName === 'screen' ? '-screen' : '');
-        const video = document.getElementById(videoId);
-        if (video) {
-            const streamId = info.sessionId + (info.trackName === 'screen' ? '-screen' : '');
-            let stream = remoteStreamsMap.get(streamId);
-            if (!stream) {
-                stream = new MediaStream();
-                remoteStreamsMap.set(streamId, stream);
-            }
-            
-            if (!stream.getTracks().some(t => t.id === track.id)) {
-                console.info('[UIManager] Adding track to stream:', info.trackName, track.id);
-                stream.addTrack(track);
-            }
 
-            if (video.srcObject !== stream) {
-                video.srcObject = stream;
-            }
-            
-            video.play().catch(e => {
-                if (e.name !== 'AbortError') console.error("[UIManager] Video play failed:", e);
-            });
-            
-            container.classList.remove('no-video');
+        const videoId = 'video-' + info.sessionId + (isScreen ? '-screen' : '');
+        const video = document.getElementById(videoId);
+        if (!video) {
+            console.error('[UIManager] setupRemoteVideo: video element not found:', videoId);
+            return;
+        }
+
+        const streamId = info.sessionId + (isScreen ? '-screen' : '');
+        let stream = remoteStreamsMap.get(streamId);
+        if (!stream) {
+            stream = new MediaStream();
+            remoteStreamsMap.set(streamId, stream);
+        }
+
+        if (!stream.getTracks().some(t => t.id === track.id)) {
+            console.info('[UIManager] Adding track to stream:', info.trackName, track.id, 'kind:', track.kind);
+            stream.addTrack(track);
+        }
+
+        if (video.srcObject !== stream) {
+            video.srcObject = stream;
+        }
+
+        video.play().catch(e => {
+            if (e.name !== 'AbortError') console.error("[UIManager] Video play failed:", e);
+        });
+
+        container.classList.remove('no-video');
+
+        // For screen shares, ensure the container is visually distinct
+        if (isScreen) {
+            container.classList.add('screen-share-mode');
         }
     }
 
