@@ -149,11 +149,12 @@ class WebRTCManager {
                     });
                 }
 
-                const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
-                const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
-                if (remoteSdp) {
-                    await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                if (data.sessionDescription) {
+                    await this.pc.setRemoteDescription(
+                        new RTCSessionDescription(data.sessionDescription)
+                    );
                 }
+                await this._waitForStableSignalingState();
             } else {
                 // No new tracks — SDP-only update via /renegotiate
                 // (e.g. screen transceiver went inactive)
@@ -163,11 +164,12 @@ class WebRTCManager {
                     body: JSON.stringify({ sessionDescription })
                 });
                 const data = await res.json();
-                const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
-                const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
-                if (remoteSdp) {
-                    await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                if (data.sessionDescription) {
+                    await this.pc.setRemoteDescription(
+                        new RTCSessionDescription(data.sessionDescription)
+                    );
                 }
+                await this._waitForStableSignalingState();
             }
 
             this.pc.getTransceivers().forEach(t => {
@@ -263,27 +265,26 @@ class WebRTCManager {
             const data = await res.json();
             if (!res.ok) throw new Error(data.errorDescription || 'Subscription failed');
 
-            if (data.sessionDescription && data.sessionDescription.type === 'offer') {
+            // Map returned track metadata (mid assignments from server)
+            if (data.tracks && data.tracks.length > 0) {
+                data.tracks.forEach(t => {
+                    if (t.mid) {
+                        this.transceiversMap.set(t.mid, {
+                            location: t.location || 'remote', sessionId: t.sessionId, trackName: t.trackName
+                        });
+                        this.subscribedTracks.add(t.sessionId + ':' + t.trackName);
+                    }
+                });
+            }
+
+            // Following Cloudflare partytracks pattern: only renegotiate
+            // when the server explicitly requires it.
+            if (data.requiresImmediateRenegotiation) {
                 const existingMids = new Set(this.transceiversMap.keys());
 
-                // Map returned track metadata (mid assignments from server)
-                if (data.tracks && data.tracks.length > 0) {
-                    const hasMids = data.tracks.some(t => t.mid);
-                    if (hasMids) {
-                        data.tracks.forEach(t => {
-                            if (t.mid) {
-                                this.transceiversMap.set(t.mid, {
-                                    location: t.location || 'remote', sessionId: t.sessionId, trackName: t.trackName
-                                });
-                                this.subscribedTracks.add(t.sessionId + ':' + t.trackName);
-                            }
-                        });
-                    }
-                }
-
-                // Server returns an offer with new recvonly transceivers — set it,
-                // then answer and send via /renegotiate
-                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sessionDescription));
+                await this.pc.setRemoteDescription(
+                    new RTCSessionDescription(data.sessionDescription)
+                );
 
                 // Fallback: if no mids from server, map new recvonly transceivers by order
                 if (!data.tracks || !data.tracks.some(t => t.mid)) {
@@ -309,9 +310,11 @@ class WebRTCManager {
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
                 await this._sendRenegotiateAnswer(callsSessionId);
-                this._processDeferredOnTrackEvents();
-                this._ensurePulledTracksDisplayed(tracksToProcess);
+                await this._waitForStableSignalingState();
             }
+
+            this._processDeferredOnTrackEvents();
+            this._ensurePulledTracksDisplayed(tracksToProcess);
         } catch (e) {
             console.error('[WebRTCManager] Subscription Error:', e);
             this.pendingRemoteTracks = [...tracksToProcess, ...this.pendingRemoteTracks];
@@ -328,62 +331,40 @@ class WebRTCManager {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
+                sessionDescription: {
+                    type: 'answer',
+                    sdp: this.pc.currentLocalDescription.sdp
+                }
             })
         });
 
-        if (res.status === 406) {
-            // 406: server rejected our answer — SDP state out of sync.
-            // After setLocalDescription(answer), PC is in "stable" state,
-            // so we can create a fresh offer to re-sync with the server.
-            console.warn('[WebRTCManager] /renegotiate 406 — re-syncing with fresh offer');
-            const freshOffer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(freshOffer);
-            const retryRes = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionDescription: { type: 'offer', sdp: this.pc.localDescription.sdp }
-                })
-            });
-            if (retryRes.ok) {
-                try {
-                    const retryData = await retryRes.json();
-                    const sdp = retryData.sdp || (retryData.sessionDescription ? retryData.sessionDescription.sdp : null);
-                    const type = retryData.type || (retryData.sessionDescription ? retryData.sessionDescription.type : 'answer');
-                    if (sdp) {
-                        await this.pc.setRemoteDescription(new RTCSessionDescription({ type, sdp }));
-                    }
-                } catch (e) { /* response may not be JSON */ }
-            }
-            return;
-        }
-
         if (!res.ok) {
-            console.error('[WebRTCManager] /renegotiate failed:', res.status);
-            return;
+            const data = await res.json().catch(() => ({}));
+            console.error('[WebRTCManager] /renegotiate failed:', res.status, data.errorDescription || '');
+            throw new Error(data.errorDescription || 'Renegotiation failed');
         }
+    }
 
-        // Process any SDP the server returns to keep state in sync
-        try {
-            const data = await res.json();
-            const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
-            const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : null);
-            if (remoteSdp && remoteType) {
-                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
-                if (remoteType === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
-                        })
-                    });
+    /**
+     * Wait for the PeerConnection signaling state to become "stable".
+     * Mirrors Cloudflare partytracks' signalingStateIsStable() helper.
+     */
+    _waitForStableSignalingState() {
+        if (!this.pc || this.pc.signalingState === 'stable') return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                this.pc.removeEventListener('signalingstatechange', handler);
+                reject(new Error('Signaling state did not stabilize within 5s'));
+            }, 5000);
+            const handler = () => {
+                if (this.pc.signalingState === 'stable') {
+                    this.pc.removeEventListener('signalingstatechange', handler);
+                    clearTimeout(timeout);
+                    resolve();
                 }
-            }
-        } catch (e) { /* response may not be JSON */ }
+            };
+            this.pc.addEventListener('signalingstatechange', handler);
+        });
     }
 
     /**
