@@ -73,6 +73,9 @@ class WebRTCManager {
             const tracks = [];
             const localTracksInfo = [];
             
+            // Only include local (push) tracks — Cloudflare Calls API does not allow
+            // push and pull in the same /tracks/new request. Remote (pull) tracks
+            // are handled separately by processPendingTracks().
             this.pc.getTransceivers().forEach(t => {
                  if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
                      const trackName = this.getTrackName(t.sender.track);
@@ -90,11 +93,6 @@ class WebRTCManager {
                      tracks.push(trackEntry);
                      localTracksInfo.push({ trackName, mid: t.mid, simulcast: !!trackEntry.simulcastEncodings });
                      this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
-                 } else if (t.direction === 'recvonly') {
-                     const mapped = this.transceiversMap.get(t.mid);
-                     if (mapped && mapped.location === 'remote') {
-                         tracks.push({ location: 'remote', sessionId: mapped.sessionId, trackName: mapped.trackName });
-                     }
                  }
             });
             
