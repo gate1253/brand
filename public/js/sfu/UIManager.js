@@ -128,6 +128,7 @@ class UIManager {
             container = document.createElement('div');
             container.id = 'container-local-screen';
             container.className = 'video-container screen-share-mode';
+            container.onclick = () => this._toggleScreenShareFullscreen(container);
             container.innerHTML = `
                 <video id="localScreenVideo" autoplay playsinline muted></video>
                 <div class="label">My Screen Share (Preview)</div>`;
@@ -143,15 +144,18 @@ class UIManager {
     createVideoContainer(sessionId, isScreen) {
         let id = 'container-' + sessionId;
         if (isScreen) id += '-screen';
-        
+
         const container = document.createElement('div');
         container.id = id;
         container.className = 'video-container no-video';
-        if (isScreen) container.classList.add('screen-share-mode');
+        if (isScreen) {
+            container.classList.add('screen-share-mode');
+            container.onclick = () => this._toggleScreenShareFullscreen(container);
+        }
         container.innerHTML = `
             <video id="video-${sessionId}${isScreen ? '-screen' : ''}" autoplay playsinline></video>
             <div class="label">${isScreen ? 'Screen Share' : 'Participant'}</div>`;
-        
+
         this.videoGrid.appendChild(container);
         return container;
     }
@@ -272,6 +276,19 @@ class UIManager {
             }
         `;
         document.head.appendChild(style);
+    }
+
+    _toggleScreenShareFullscreen(container) {
+        if (container.classList.contains('screen-fullscreen')) {
+            container.classList.remove('screen-fullscreen');
+            container.style.cssText = '';
+        } else {
+            container.classList.add('screen-fullscreen');
+            Object.assign(container.style, {
+                position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+                zIndex: '200', borderRadius: '0', cursor: 'zoom-out'
+            });
+        }
     }
 
     updateScreenShareLock() {

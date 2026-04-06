@@ -94,21 +94,19 @@ class WebRTCManager {
             const offer = await this.pc.createOffer();
             await this.pc.setLocalDescription(offer);
 
-            const sessionDescription = this.pc.localDescription;
-            const newTracks = [];       // only genuinely NEW tracks for /tracks/new
-            const localTracksInfo = []; // all active local tracks for WebSocket broadcast
+            const sessionDescription = {
+                type: this.pc.localDescription.type,
+                sdp: this.pc.localDescription.sdp
+            };
+            const newTracks = [];
+            const localTracksInfo = [];
 
             this.pc.getTransceivers().forEach(t => {
                  if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
                      const trackName = this.getTrackName(t.sender.track);
-
-                     // Build broadcast list (all active local tracks)
                      localTracksInfo.push({ trackName, mid: t.mid, simulcast: false });
-
-                     // Update local mapping
                      this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
 
-                     // Only include tracks that haven't been pushed yet
                      if (!this._pushedMids.has(t.mid)) {
                          const trackEntry = { location: 'local', mid: t.mid, trackName };
                          if (t.sender.track && t.sender.track.kind === 'video' && trackName !== 'screen') {
@@ -119,7 +117,6 @@ class WebRTCManager {
                                      maxBitrate: enc.maxBitrate,
                                      scaleResolutionDownBy: enc.scaleResolutionDownBy
                                  }));
-                                 // Update broadcast entry with simulcast info
                                  localTracksInfo[localTracksInfo.length - 1].simulcast = true;
                              }
                          }
@@ -128,23 +125,18 @@ class WebRTCManager {
                  }
             });
 
-            // Only call /tracks/new when there are genuinely new tracks to push.
-            // For SDP-only updates (e.g. transceiver went inactive), use /renegotiate.
             if (newTracks.length > 0) {
+                // Push new tracks via /tracks/new (always include full SDP)
                 const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionDescription, tracks: newTracks })
                 });
-
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.errorDescription || 'Renegotiation failed');
 
-                // Mark pushed tracks so they won't be re-sent
                 newTracks.forEach(t => this._pushedMids.add(t.mid));
 
-                // Only update transceiversMap for REMOTE tracks in the response;
-                // local track mappings are already set above and must not be overwritten.
                 if (data.tracks) {
                     data.tracks.forEach(t => {
                         if (t.mid && !this._pushedMids.has(t.mid)) {
@@ -159,14 +151,23 @@ class WebRTCManager {
 
                 const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
                 const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
-                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                if (remoteSdp) {
+                    await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                }
             } else {
-                // No new tracks — just update the SDP (e.g. screen transceiver went inactive)
-                await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
+                // No new tracks — SDP-only update via /renegotiate
+                // (e.g. screen transceiver went inactive)
+                const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionDescription: { type: 'offer', sdp: sessionDescription.sdp } })
+                    body: JSON.stringify({ sessionDescription })
                 });
+                const data = await res.json();
+                const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
+                const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
+                if (remoteSdp) {
+                    await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                }
             }
 
             this.pc.getTransceivers().forEach(t => {
@@ -188,7 +189,6 @@ class WebRTCManager {
             this._processDeferredOnTrackEvents();
 
             if (this.app.signalingClient && this.app.signalingClient.isOpen()) {
-                console.info('[WebRTCManager] Sending tracks-update after renegotiate');
                 this.app.signalingClient.send({
                     type: 'tracks-update',
                     sessionId: callsSessionId,
@@ -198,7 +198,6 @@ class WebRTCManager {
                 });
             }
 
-            // After push completes, drain any pending pull tracks via the queue
             if (this.pendingRemoteTracks.length > 0) {
                 this._schedulePull();
             }
