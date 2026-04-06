@@ -91,6 +91,14 @@ class WebRTCManager {
             const callsSessionId = this.app.callsSessionId;
             if (!this.pc || !callsSessionId) return;
 
+            // Ensure PC is in stable state before starting a new negotiation.
+            // If a previous renegotiate left the PC in have-local-offer (e.g. due
+            // to a concurrent stopScreenTransceiver modifying transceivers), roll back.
+            if (this.pc.signalingState !== 'stable') {
+                console.warn('[WebRTCManager] renegotiate: signalingState is', this.pc.signalingState, '— rolling back');
+                await this.pc.setLocalDescription({ type: 'rollback' });
+            }
+
             const offer = await this.pc.createOffer();
             await this.pc.setLocalDescription(offer);
 
@@ -158,18 +166,28 @@ class WebRTCManager {
                 }
 
                 const answerSdp = this._extractSdp(data);
+                console.info('[PUSH-DEBUG] answerSdp extracted:', !!answerSdp, answerSdp?.type);
                 if (answerSdp) {
                     await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+                    console.info('[PUSH-DEBUG] setRemoteDescription 완료, signalingState:', this.pc.signalingState);
+                } else {
+                    console.error('[PUSH-DEBUG] ❌ SDP 추출 실패! data.sessionDescription:', !!data.sessionDescription, 'data.sdp:', !!data.sdp);
                 }
             } else {
                 // No new tracks — SDP-only update via /renegotiate
                 // (e.g. screen transceiver went inactive)
+                console.info('[PUSH-DEBUG] SDP-only /renegotiate (no new tracks)');
                 const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionDescription })
                 });
                 const data = await res.json();
+                console.info('[PUSH-DEBUG] /renegotiate 응답 status:', res.status, 'body:', JSON.stringify(data).substring(0, 200));
+                if (!res.ok) {
+                    console.error('[PUSH-DEBUG] ❌ /renegotiate 실패:', res.status);
+                    return; // Don't throw — let the queue continue
+                }
                 const answerSdp = this._extractSdp(data);
                 if (answerSdp) {
                     await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
