@@ -249,21 +249,10 @@ class WebRTCManager {
         this.pendingRemoteTracks = [];
 
         try {
-            // Following Cloudflare Meet pattern: include our current SDP offer
-            // in the pull request so the server knows our session state.
-            // The server returns its own offer (with new recvonly transceivers),
-            // then we answer and send via /renegotiate.
-            const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
-
             const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionDescription: {
-                        type: 'offer',
-                        sdp: this.pc.localDescription.sdp
-                    },
                     tracks: tracksToProcess.map(t => {
                         const entry = { location: 'remote', sessionId: t.sessionId, trackName: t.trackName };
                         if (t.simulcastRid) entry.simulcastRid = t.simulcastRid;
@@ -274,32 +263,30 @@ class WebRTCManager {
             const data = await res.json();
             if (!res.ok) throw new Error(data.errorDescription || 'Subscription failed');
 
-            // Map returned track metadata (mid assignments from server)
-            const hasMids = data.tracks && data.tracks.length > 0 && data.tracks.some(t => t.mid);
-            if (hasMids) {
-                data.tracks.forEach(t => {
-                    if (t.mid) {
-                        this.transceiversMap.set(t.mid, {
-                            location: t.location || 'remote',
-                            sessionId: t.sessionId,
-                            trackName: t.trackName
-                        });
-                        this.subscribedTracks.add(t.sessionId + ':' + t.trackName);
-                    }
-                });
-            }
-
-            // Server returns an offer with new recvonly transceivers for pulled tracks
-            const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
-            const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'offer');
-
-            if (remoteSdp) {
+            if (data.sessionDescription && data.sessionDescription.type === 'offer') {
                 const existingMids = new Set(this.transceiversMap.keys());
 
-                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                // Map returned track metadata (mid assignments from server)
+                if (data.tracks && data.tracks.length > 0) {
+                    const hasMids = data.tracks.some(t => t.mid);
+                    if (hasMids) {
+                        data.tracks.forEach(t => {
+                            if (t.mid) {
+                                this.transceiversMap.set(t.mid, {
+                                    location: t.location || 'remote', sessionId: t.sessionId, trackName: t.trackName
+                                });
+                                this.subscribedTracks.add(t.sessionId + ':' + t.trackName);
+                            }
+                        });
+                    }
+                }
+
+                // Server returns an offer with new recvonly transceivers — set it,
+                // then answer and send via /renegotiate
+                await this.pc.setRemoteDescription(new RTCSessionDescription(data.sessionDescription));
 
                 // Fallback: if no mids from server, map new recvonly transceivers by order
-                if (!hasMids) {
+                if (!data.tracks || !data.tracks.some(t => t.mid)) {
                     console.warn('[WebRTCManager] Server response lacks mid metadata, falling back to order-based mapping');
                     const newRecvMids = [];
                     this.pc.getTransceivers().forEach(t => {
@@ -319,16 +306,12 @@ class WebRTCManager {
                     });
                 }
 
-                // Complete the offer/answer exchange
-                if (remoteType === 'offer') {
-                    const answer = await this.pc.createAnswer();
-                    await this.pc.setLocalDescription(answer);
-                    await this._sendRenegotiateAnswer(callsSessionId);
-                }
+                const answer = await this.pc.createAnswer();
+                await this.pc.setLocalDescription(answer);
+                await this._sendRenegotiateAnswer(callsSessionId);
+                this._processDeferredOnTrackEvents();
+                this._ensurePulledTracksDisplayed(tracksToProcess);
             }
-
-            this._processDeferredOnTrackEvents();
-            this._ensurePulledTracksDisplayed(tracksToProcess);
         } catch (e) {
             console.error('[WebRTCManager] Subscription Error:', e);
             this.pendingRemoteTracks = [...tracksToProcess, ...this.pendingRemoteTracks];
