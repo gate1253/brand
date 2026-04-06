@@ -90,7 +90,14 @@ class MediaManager {
         if (this.activeStreamType !== 'canvas' && this.procCanvas) {
             this.activeStreamType = 'canvas';
             this.processedStream = this.procCanvas.captureStream(30);
-            return this.processedStream.getVideoTracks()[0];
+        }
+
+        if (this.processedStream) {
+            const canvasTrack = this.processedStream.getVideoTracks()[0];
+            if (canvasTrack) {
+                canvasTrack.contentHint = 'detail';
+                return canvasTrack;
+            }
         }
         return null;
     }
@@ -108,8 +115,10 @@ class MediaManager {
         if (this.currentBgMode === 'none' || !this.ctx) return;
         const width = results.image.width;
         const height = results.image.height;
-        this.procCanvas.width = width;
-        this.procCanvas.height = height;
+        if (this.procCanvas.width !== width || this.procCanvas.height !== height) {
+            this.procCanvas.width = width;
+            this.procCanvas.height = height;
+        }
         
         this.ctx.save();
         this.ctx.clearRect(0, 0, width, height);

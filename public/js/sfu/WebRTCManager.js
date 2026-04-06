@@ -53,7 +53,11 @@ class WebRTCManager {
 
     async renegotiate() {
         const callsSessionId = this.app.callsSessionId;
-        if (!this.pc || !callsSessionId || this.isRenegotiating) return;
+        if (!this.pc || !callsSessionId) return;
+        if (this.isRenegotiating) {
+            this._renegotiateQueued = true;
+            return;
+        }
         
         this.isRenegotiating = true;
         try {
@@ -128,7 +132,12 @@ class WebRTCManager {
             console.error("[WebRTCManager] Renegotiate Error:", e);
         } finally {
             this.isRenegotiating = false;
-            if (this.pendingRemoteTracks.length > 0) setTimeout(() => this.processPendingTracks(), 100);
+            if (this._renegotiateQueued) {
+                this._renegotiateQueued = false;
+                setTimeout(() => this.renegotiate(), 50);
+            } else if (this.pendingRemoteTracks.length > 0) {
+                setTimeout(() => this.processPendingTracks(), 100);
+            }
         }
     }
 
@@ -296,14 +305,23 @@ class WebRTCManager {
         this.rebalanceSimulcastLayers();
     }
 
-    replaceVideoTrack(newTrack) {
+    async replaceVideoTrack(newTrack) {
         if (!this.pc) return;
-        this.pc.getTransceivers().forEach(t => {
+        for (const t of this.pc.getTransceivers()) {
             const info = this.transceiversMap.get(t.mid);
             if (info && info.location === 'local' && info.trackName === 'video') {
-                t.sender.replaceTrack(newTrack);
+                await t.sender.replaceTrack(newTrack);
+                if (newTrack && newTrack.contentHint === 'detail') {
+                    const params = t.sender.getParameters();
+                    if (params.encodings) {
+                        params.encodings.forEach(enc => {
+                            enc.degradationPreference = 'maintain-resolution';
+                        });
+                        await t.sender.setParameters(params);
+                    }
+                }
             }
-        });
+        }
         this.app.uiManager.updateLocalVideo(newTrack);
     }
 
@@ -332,6 +350,7 @@ class WebRTCManager {
             if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
                 t.direction = 'inactive';
                 t.sender.replaceTrack(null);
+                this.transceiversMap.delete(t.mid);
             }
         });
     }

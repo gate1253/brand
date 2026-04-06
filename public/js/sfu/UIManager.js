@@ -35,25 +35,43 @@ class UIManager {
         };
 
         this.toggleScreenBtn.onclick = async () => {
-            const { active, stream } = await this.app.mediaManager.toggleScreen();
-            
-            if (!active) {
-                this.toggleScreenBtn.classList.remove('active');
-                this.app.webrtcManager.stopScreenTransceiver();
-                
-                // Remove local preview
-                const localScreenContainer = document.getElementById('container-local-screen');
-                if (localScreenContainer) localScreenContainer.remove();
+            try {
+                const { active, stream } = await this.app.mediaManager.toggleScreen();
 
-                await this.app.webrtcManager.renegotiate();
-            } else {
-                this.toggleScreenBtn.classList.add('active');
-                
-                // Add local preview
-                this.renderLocalScreenPreview(stream);
+                if (!active) {
+                    this.toggleScreenBtn.classList.remove('active');
+                    this.app.webrtcManager.stopScreenTransceiver();
 
-                this.app.webrtcManager.pc.addTransceiver(stream.getVideoTracks()[0], { direction: 'sendonly' });
-                await this.app.webrtcManager.renegotiate();
+                    // Remove local preview
+                    const localScreenContainer = document.getElementById('container-local-screen');
+                    if (localScreenContainer) localScreenContainer.remove();
+
+                    await this.app.webrtcManager.renegotiate();
+                } else {
+                    this.toggleScreenBtn.classList.add('active');
+
+                    // Add local preview
+                    this.renderLocalScreenPreview(stream);
+
+                    // Reuse an existing inactive screen transceiver if available
+                    const pc = this.app.webrtcManager.pc;
+                    let reused = false;
+                    pc.getTransceivers().forEach(t => {
+                        if (reused) return;
+                        const mapped = this.app.webrtcManager.transceiversMap.get(t.mid);
+                        if (mapped && mapped.trackName === 'screen' && t.direction === 'inactive') {
+                            t.direction = 'sendonly';
+                            t.sender.replaceTrack(stream.getVideoTracks()[0]);
+                            reused = true;
+                        }
+                    });
+                    if (!reused) {
+                        pc.addTransceiver(stream.getVideoTracks()[0], { direction: 'sendonly' });
+                    }
+                    await this.app.webrtcManager.renegotiate();
+                }
+            } catch (e) {
+                console.warn('[UIManager] Screen share cancelled or failed:', e.name, e.message);
             }
         };
 
