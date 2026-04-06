@@ -332,30 +332,58 @@ class WebRTCManager {
             })
         });
 
+        if (res.status === 406) {
+            // 406: server rejected our answer — SDP state out of sync.
+            // After setLocalDescription(answer), PC is in "stable" state,
+            // so we can create a fresh offer to re-sync with the server.
+            console.warn('[WebRTCManager] /renegotiate 406 — re-syncing with fresh offer');
+            const freshOffer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(freshOffer);
+            const retryRes = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionDescription: { type: 'offer', sdp: this.pc.localDescription.sdp }
+                })
+            });
+            if (retryRes.ok) {
+                try {
+                    const retryData = await retryRes.json();
+                    const sdp = retryData.sdp || (retryData.sessionDescription ? retryData.sessionDescription.sdp : null);
+                    const type = retryData.type || (retryData.sessionDescription ? retryData.sessionDescription.type : 'answer');
+                    if (sdp) {
+                        await this.pc.setRemoteDescription(new RTCSessionDescription({ type, sdp }));
+                    }
+                } catch (e) { /* response may not be JSON */ }
+            }
+            return;
+        }
+
         if (!res.ok) {
             console.error('[WebRTCManager] /renegotiate failed:', res.status);
             return;
         }
 
         // Process any SDP the server returns to keep state in sync
-        const data = await res.json();
-        const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
-        const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : null);
-        if (remoteSdp && remoteType) {
-            await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
-            if (remoteType === 'offer') {
-                const answer = await this.pc.createAnswer();
-                await this.pc.setLocalDescription(answer);
-                // Send follow-up answer (non-recursive — single retry)
-                await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
-                    })
-                });
+        try {
+            const data = await res.json();
+            const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
+            const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : null);
+            if (remoteSdp && remoteType) {
+                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+                if (remoteType === 'offer') {
+                    const answer = await this.pc.createAnswer();
+                    await this.pc.setLocalDescription(answer);
+                    await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
+                        })
+                    });
+                }
             }
-        }
+        } catch (e) { /* response may not be JSON */ }
     }
 
     /**
