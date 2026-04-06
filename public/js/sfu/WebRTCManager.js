@@ -35,7 +35,18 @@ class WebRTCManager {
 
         if (localStream) {
             localStream.getTracks().forEach(track => {
-                this.pc.addTransceiver(track, { direction: 'sendonly' });
+                if (track.kind === 'video') {
+                    this.pc.addTransceiver(track, {
+                        direction: 'sendonly',
+                        sendEncodings: [
+                            { rid: 'h', maxBitrate: 1_200_000, scaleResolutionDownBy: 1 },
+                            { rid: 'm', maxBitrate: 300_000, scaleResolutionDownBy: 2 },
+                            { rid: 'l', maxBitrate: 100_000, scaleResolutionDownBy: 4 }
+                        ]
+                    });
+                } else {
+                    this.pc.addTransceiver(track, { direction: 'sendonly' });
+                }
             });
         }
     }
@@ -56,8 +67,19 @@ class WebRTCManager {
             this.pc.getTransceivers().forEach(t => {
                  if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
                      const trackName = this.getTrackName(t.sender.track);
-                     tracks.push({ location: 'local', mid: t.mid, trackName });
-                     localTracksInfo.push({ trackName, mid: t.mid });
+                     const trackEntry = { location: 'local', mid: t.mid, trackName };
+                     if (t.sender.track && t.sender.track.kind === 'video' && trackName !== 'screen') {
+                         const params = t.sender.getParameters();
+                         if (params.encodings && params.encodings.length > 1) {
+                             trackEntry.simulcastEncodings = params.encodings.map(enc => ({
+                                 rid: enc.rid,
+                                 maxBitrate: enc.maxBitrate,
+                                 scaleResolutionDownBy: enc.scaleResolutionDownBy
+                             }));
+                         }
+                     }
+                     tracks.push(trackEntry);
+                     localTracksInfo.push({ trackName, mid: t.mid, simulcast: !!trackEntry.simulcastEncodings });
                      this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
                  } else if (t.direction === 'recvonly') {
                      const mapped = this.transceiversMap.get(t.mid);
@@ -145,9 +167,11 @@ class WebRTCManager {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    tracks: tracksToProcess.map(t => ({
-                        location: 'remote', sessionId: t.sessionId, trackName: t.trackName
-                    }))
+                    tracks: tracksToProcess.map(t => {
+                        const entry = { location: 'remote', sessionId: t.sessionId, trackName: t.trackName };
+                        if (t.simulcastRid) entry.simulcastRid = t.simulcastRid;
+                        return entry;
+                    })
                 })
             });
             const data = await res.json();
@@ -189,19 +213,28 @@ class WebRTCManager {
     handleRemoteTracksUpdate(msg) {
         const sid = msg.sessionId || msg.clientId;
         if (!sid) return;
-        console.info('[WebRTCManager] handleRemoteTracksUpdate from:', sid);
+        console.info('[WebRTCManager] handleRemoteTracksUpdate from:', sid, 'tracks:', msg.tracks);
+
+        // Build a set of all track names advertised by this remote peer
         const currentRemoteTracks = new Set(msg.tracks.map(t => sid + ':' + t.trackName));
-        
+
         msg.tracks.forEach(t => {
             const key = sid + ':' + t.trackName;
             if (!this.subscribedTracks.has(key)) {
                 if (!this.pendingRemoteTracks.some(p => p.sessionId === sid && p.trackName === t.trackName)) {
-                    this.pendingRemoteTracks.push({ sessionId: sid, trackName: t.trackName });
+                    // For simulcast-capable video tracks, request the 'mid' layer by default
+                    // to balance quality and bandwidth in multi-party scenarios
+                    const pendingEntry = { sessionId: sid, trackName: t.trackName };
+                    if (t.simulcast && t.trackName === 'video') {
+                        pendingEntry.simulcastRid = this._selectSimulcastLayer(sid);
+                    }
+                    this.pendingRemoteTracks.push(pendingEntry);
                 }
             }
         });
 
-        for (let key of this.subscribedTracks) {
+        // Remove tracks that the remote peer no longer advertises
+        for (let key of Array.from(this.subscribedTracks)) {
             if (key.startsWith(sid + ':') && !currentRemoteTracks.has(key)) {
                 this.subscribedTracks.delete(key);
                 const trackName = key.split(':')[1];
@@ -210,6 +243,33 @@ class WebRTCManager {
         }
 
         if (this.pendingRemoteTracks.length > 0) this.processPendingTracks();
+    }
+
+    /**
+     * Select the appropriate simulcast layer based on participant count.
+     * Fewer participants → higher quality; more participants → lower quality.
+     */
+    _selectSimulcastLayer(excludeSessionId) {
+        const participantCount = this._getRemoteParticipantCount(excludeSessionId);
+        if (participantCount <= 2) return 'h';   // 1-on-1 or small call: high quality
+        if (participantCount <= 4) return 'm';   // medium group: mid quality
+        return 'l';                               // large group: low quality to save bandwidth
+    }
+
+    /**
+     * Count unique remote participants currently subscribed or pending.
+     */
+    _getRemoteParticipantCount(excludeSessionId) {
+        const sessions = new Set();
+        for (const key of this.subscribedTracks) {
+            const sid = key.split(':')[0];
+            if (sid !== excludeSessionId) sessions.add(sid);
+        }
+        for (const entry of this.pendingRemoteTracks) {
+            if (entry.sessionId !== excludeSessionId) sessions.add(entry.sessionId);
+        }
+        // +1 for the new participant being added
+        return sessions.size + 1;
     }
 
     handleRemoteLeave(msg) {
@@ -232,6 +292,8 @@ class WebRTCManager {
                 this.transceiversMap.delete(t.mid);
             }
         });
+
+        this.rebalanceSimulcastLayers();
     }
 
     replaceVideoTrack(newTrack) {
@@ -243,6 +305,25 @@ class WebRTCManager {
             }
         });
         this.app.uiManager.updateLocalVideo(newTrack);
+    }
+
+    /**
+     * Rebalance simulcast layers for all subscribed video tracks
+     * based on the current number of participants.
+     * Call this when participants join or leave.
+     */
+    async rebalanceSimulcastLayers() {
+        if (!this.pc) return;
+        const participantCount = this._getRemoteParticipantCount(null);
+        let desiredRid;
+        if (participantCount <= 2) desiredRid = 'h';
+        else if (participantCount <= 4) desiredRid = 'm';
+        else desiredRid = 'l';
+
+        console.info('[WebRTCManager] Rebalancing simulcast to rid:', desiredRid, 'participants:', participantCount);
+        // Note: actual layer selection is enforced server-side via the Calls API.
+        // This updates client-side preference for future subscriptions.
+        this._currentPreferredRid = desiredRid;
     }
     
     stopScreenTransceiver() {

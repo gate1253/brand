@@ -21,6 +21,13 @@ class MediaManager {
         this.selfieSegmentation = null;
         this.procCanvas = document.getElementById('procCanvas');
         this.ctx = this.procCanvas ? this.procCanvas.getContext('2d') : null;
+
+        // VAD state
+        this.audioContext = null;
+        this.analyser = null;
+        this.vadInterval = null;
+        this.isSpeaking = false;
+        this.vadThreshold = 15;
     }
 
     async initCamera() {
@@ -29,6 +36,7 @@ class MediaManager {
             audio: true
         });
         this.localStream = this.cameraStream;
+        this.startVAD(this.localStream);
         return this.localStream;
     }
 
@@ -168,7 +176,55 @@ class MediaManager {
         sendToMediaPipe();
     }
     
+    startVAD(stream) {
+        if (this.vadInterval) return;
+
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = this.audioContext.createMediaStreamSource(stream);
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 512;
+        source.connect(this.analyser);
+
+        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
+        this.vadInterval = setInterval(() => {
+            this.analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const average = sum / dataArray.length;
+
+            const speaking = average > this.vadThreshold;
+            if (speaking !== this.isSpeaking) {
+                this.isSpeaking = speaking;
+                if (this.app.signalingClient) {
+                    this.app.signalingClient.send({
+                        type: 'speaker-update',
+                        speaker: speaking,
+                        sessionId: this.app.callsSessionId
+                    });
+                }
+                // Highlight local tile too
+                if (this.app.uiManager) {
+                    this.app.uiManager.handleSpeakerUpdate('local', speaking);
+                }
+            }
+        }, 150);
+    }
+
+    stopVAD() {
+        if (this.vadInterval) {
+            clearInterval(this.vadInterval);
+            this.vadInterval = null;
+        }
+        if (this.audioContext) {
+            this.audioContext.close();
+            this.audioContext = null;
+        }
+        this.isSpeaking = false;
+    }
+
     stopAll() {
+        this.stopVAD();
         if (this.localStream) this.localStream.getTracks().forEach(track => track.stop());
         if (this.screenStream) this.screenStream.getTracks().forEach(track => track.stop());
     }

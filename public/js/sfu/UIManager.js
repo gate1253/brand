@@ -17,6 +17,7 @@ class UIManager {
         this.bgOptions = document.querySelectorAll('.bg-option');
         
         this.bindEvents();
+        this._injectSpeakingStyles();
     }
 
     bindEvents() {
@@ -225,6 +226,36 @@ class UIManager {
         containers.forEach(c => c.remove());
         remoteStreamsMap.delete(sid);
         remoteStreamsMap.delete(sid + '-screen');
+    }
+
+    _injectSpeakingStyles() {
+        if (document.getElementById('speaking-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'speaking-styles';
+        style.textContent = `
+            .video-container.speaking {
+                box-shadow: 0 0 0 3px #22c55e, 0 0 12px rgba(34, 197, 94, 0.4);
+                border-radius: 8px;
+                transition: box-shadow 0.2s ease;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    handleSpeakerUpdate(sessionId, isSpeaking) {
+        let container;
+        if (sessionId === 'local') {
+            container = document.getElementById('localVideoContainer');
+        } else {
+            container = document.getElementById('container-' + sessionId);
+        }
+        if (!container) return;
+
+        if (isSpeaking) {
+            container.classList.add('speaking');
+        } else {
+            container.classList.remove('speaking');
+        }
     }
 
     handleLeave() {
