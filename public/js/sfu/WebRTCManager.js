@@ -271,6 +271,7 @@ class WebRTCManager {
                         await this.pc.setLocalDescription(answer);
                         await this._sendRenegotiateAnswer(callsSessionId);
                         this._processDeferredOnTrackEvents();
+                        this._ensurePulledTracksDisplayed(tracksToProcess);
                         this._drainIfPending();
                         return;
                     }
@@ -298,6 +299,7 @@ class WebRTCManager {
                     await this.pc.setLocalDescription(answer);
                     await this._sendRenegotiateAnswer(callsSessionId);
                     this._processDeferredOnTrackEvents();
+                    this._ensurePulledTracksDisplayed(tracksToProcess);
                     this._drainIfPending();
                     return;
                 }
@@ -307,6 +309,7 @@ class WebRTCManager {
                 await this.pc.setLocalDescription(answer);
                 await this._sendRenegotiateAnswer(callsSessionId);
                 this._processDeferredOnTrackEvents();
+                this._ensurePulledTracksDisplayed(tracksToProcess);
             }
         } catch (e) {
             console.error('[WebRTCManager] Subscription Error:', e);
@@ -497,6 +500,25 @@ class WebRTCManager {
             }
         }
         this._deferredOnTrackEvents = remaining;
+    }
+
+    /**
+     * After a pull completes, ensure every pulled track is wired to the UI.
+     * Handles the case where the browser reuses an existing transceiver and
+     * does NOT fire pc.ontrack (common on second+ screen-share subscriptions).
+     */
+    _ensurePulledTracksDisplayed(tracksToProcess) {
+        for (const requested of tracksToProcess) {
+            for (const [mid, info] of this.transceiversMap.entries()) {
+                if (info.location === 'remote' && info.sessionId === requested.sessionId && info.trackName === requested.trackName) {
+                    const transceiver = this.pc.getTransceivers().find(t => t.mid === mid);
+                    if (transceiver && transceiver.receiver && transceiver.receiver.track) {
+                        console.info('[WebRTCManager] Ensuring pulled track is displayed:', mid, info.trackName);
+                        this.app.uiManager.setupRemoteVideo(info, transceiver.receiver.track, this.remoteStreams);
+                    }
+                }
+            }
+        }
     }
 
     isRemoteScreenSharing() {

@@ -214,13 +214,14 @@ class UIManager {
         console.info('[UIManager] removeRemoteTrackUI:', sid, trackName);
         const streamId = sid + (trackName === 'screen' ? '-screen' : '');
         const stream = remoteStreamsMap.get(streamId);
-        
+
         if (stream) {
             const kind = (trackName === 'audio') ? 'audio' : 'video';
             stream.getTracks().forEach(t => {
                 if (t.kind === kind) {
-                    console.info('[UIManager] Stopping and removing track:', kind, t.id);
-                    t.stop();
+                    console.info('[UIManager] Removing remote track from stream:', kind, t.id);
+                    // Do NOT call t.stop() on remote (receiver) tracks — stopping
+                    // permanently ends them so the SFU cannot reuse the transceiver.
                     stream.removeTrack(t);
                 }
             });
@@ -241,12 +242,11 @@ class UIManager {
             if (el) el.remove();
             remoteStreamsMap.delete(streamId);
         }
-        
+
         if (pc) {
             pc.getTransceivers().forEach(t => {
                 const mapped = transceiversMap.get(t.mid);
                 if (mapped && mapped.sessionId === sid && mapped.trackName === trackName) {
-                    t.direction = 'inactive';
                     transceiversMap.delete(t.mid);
                 }
             });
