@@ -18,6 +18,11 @@ class WebRTCManager {
 
         // Track who is currently screen-sharing (null = nobody)
         this._remoteScreenSharerSid = null;
+
+        // Mids that have already been pushed to the SFU via /tracks/new.
+        // Only genuinely new tracks should be sent; re-sending existing ones
+        // causes the SFU to create duplicate track distributions.
+        this._pushedMids = new Set();
     }
 
     /**
@@ -90,53 +95,79 @@ class WebRTCManager {
             await this.pc.setLocalDescription(offer);
 
             const sessionDescription = this.pc.localDescription;
-            const tracks = [];
-            const localTracksInfo = [];
+            const newTracks = [];       // only genuinely NEW tracks for /tracks/new
+            const localTracksInfo = []; // all active local tracks for WebSocket broadcast
 
             this.pc.getTransceivers().forEach(t => {
                  if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
                      const trackName = this.getTrackName(t.sender.track);
-                     const trackEntry = { location: 'local', mid: t.mid, trackName };
-                     if (t.sender.track && t.sender.track.kind === 'video' && trackName !== 'screen') {
-                         const params = t.sender.getParameters();
-                         if (params.encodings && params.encodings.length > 1) {
-                             trackEntry.simulcastEncodings = params.encodings.map(enc => ({
-                                 rid: enc.rid,
-                                 maxBitrate: enc.maxBitrate,
-                                 scaleResolutionDownBy: enc.scaleResolutionDownBy
-                             }));
-                         }
-                     }
-                     tracks.push(trackEntry);
-                     localTracksInfo.push({ trackName, mid: t.mid, simulcast: !!trackEntry.simulcastEncodings });
+
+                     // Build broadcast list (all active local tracks)
+                     localTracksInfo.push({ trackName, mid: t.mid, simulcast: false });
+
+                     // Update local mapping
                      this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
+
+                     // Only include tracks that haven't been pushed yet
+                     if (!this._pushedMids.has(t.mid)) {
+                         const trackEntry = { location: 'local', mid: t.mid, trackName };
+                         if (t.sender.track && t.sender.track.kind === 'video' && trackName !== 'screen') {
+                             const params = t.sender.getParameters();
+                             if (params.encodings && params.encodings.length > 1) {
+                                 trackEntry.simulcastEncodings = params.encodings.map(enc => ({
+                                     rid: enc.rid,
+                                     maxBitrate: enc.maxBitrate,
+                                     scaleResolutionDownBy: enc.scaleResolutionDownBy
+                                 }));
+                                 // Update broadcast entry with simulcast info
+                                 localTracksInfo[localTracksInfo.length - 1].simulcast = true;
+                             }
+                         }
+                         newTracks.push(trackEntry);
+                     }
                  }
             });
 
-            const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionDescription, tracks })
-            });
+            // Only call /tracks/new when there are genuinely new tracks to push.
+            // For SDP-only updates (e.g. transceiver went inactive), use /renegotiate.
+            if (newTracks.length > 0) {
+                const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionDescription, tracks: newTracks })
+                });
 
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.errorDescription || 'Renegotiation failed');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.errorDescription || 'Renegotiation failed');
 
-            if (data.tracks) {
-                data.tracks.forEach(t => {
-                    if (t.mid) {
-                        this.transceiversMap.set(t.mid, {
-                            location: t.location || 'remote',
-                            sessionId: t.sessionId,
-                            trackName: t.trackName
-                        });
-                    }
+                // Mark pushed tracks so they won't be re-sent
+                newTracks.forEach(t => this._pushedMids.add(t.mid));
+
+                // Only update transceiversMap for REMOTE tracks in the response;
+                // local track mappings are already set above and must not be overwritten.
+                if (data.tracks) {
+                    data.tracks.forEach(t => {
+                        if (t.mid && !this._pushedMids.has(t.mid)) {
+                            this.transceiversMap.set(t.mid, {
+                                location: t.location || 'remote',
+                                sessionId: t.sessionId,
+                                trackName: t.trackName
+                            });
+                        }
+                    });
+                }
+
+                const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
+                const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
+                await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
+            } else {
+                // No new tracks — just update the SDP (e.g. screen transceiver went inactive)
+                await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionDescription: { type: 'offer', sdp: sessionDescription.sdp } })
                 });
             }
-
-            const remoteSdp = data.sdp || (data.sessionDescription ? data.sessionDescription.sdp : null);
-            const remoteType = data.type || (data.sessionDescription ? data.sessionDescription.type : 'answer');
-            await this.pc.setRemoteDescription(new RTCSessionDescription({ type: remoteType, sdp: remoteSdp }));
 
             this.pc.getTransceivers().forEach(t => {
                 if (t.mid && t.direction === 'recvonly' && !this.transceiversMap.has(t.mid)) {
@@ -531,7 +562,7 @@ class WebRTCManager {
             if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
                 t.direction = 'inactive';
                 t.sender.replaceTrack(null);
-                // Remove mapping entirely — we will create a fresh transceiver next time
+                this._pushedMids.delete(t.mid);
                 this.transceiversMap.delete(t.mid);
             }
         });

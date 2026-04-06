@@ -72,10 +72,53 @@
 
 ---
 
+## 4. renegotiate() 트랙 중복 push로 인한 SFU 매핑 오염
+
+### 문제
+- 화면 공유 최초 1회는 정상이나, 해제 후 재공유 시 스트림 전송 안 됨
+- 수신자에 화면 공유 UI 컨테이너는 생성되지만, 내부 스트림은 비어 있음
+- 송신자 배경 변경 시 수신자의 화면 공유 컨테이너에도 송신자 얼굴이 표시됨 (얼굴 두 군데)
+
+### 원인
+- `renegotiate()`가 매번 **모든** sendonly 트랜시버(audio, video, screen)를 `/tracks/new`에 전송
+- Cloudflare Calls `/tracks/new` API는 **새 트랙 등록** 전용이므로, 이미 등록된 audio/video를 재전송하면 SFU가 중복 트랙 배포를 생성
+- 중복으로 인해:
+  - 수신자에 video 트랙이 screen 컨테이너에도 배포됨 → 배경 변경 시 얼굴이 두 곳에 표시
+  - 새 screen 트랙이 올바르게 매핑되지 않음 → 화면 공유 컨테이너에 스트림 없음
+- SFU 응답의 `data.tracks`가 `location: t.location || 'remote'`로 처리되어, local 트랙 매핑이 `'remote'`로 덮어씌워짐 → `transceiversMap` 오염
+
+### 수정 (WebRTCManager.js)
+
+#### `_pushedMids` Set 추가
+- 이미 SFU에 push 완료된 트랜시버 mid를 추적
+- 새 트랜시버만 `/tracks/new` 요청에 포함
+
+#### `renegotiate()` 분기 처리
+- **새 트랙 존재 시**: `/tracks/new`에 **새 트랙만** 전송 (기존 audio/video 제외)
+- **새 트랙 없음 (SDP 변경만)**: `/renegotiate`로 SDP offer만 전송 (화면 공유 해제 등)
+- push 성공 후 `_pushedMids`에 mid 추가
+
+#### SFU 응답 처리 보호
+- `data.tracks` 처리 시 `_pushedMids`에 포함된 mid는 건너뛰어 local 매핑 보호
+- SFU 응답이 local 트랙을 'remote'로 덮어쓰는 문제 방지
+
+#### `stopScreenTransceiver()` 정리
+- `_pushedMids`에서 해당 mid 삭제 → 재공유 시 새 트랙으로 인식
+
+### 동작 흐름 (수정 후)
+1. 초기 접속: audio+video push → `_pushedMids = {mid0, mid1}`
+2. 1차 화면 공유: screen만 push (mid2) → `_pushedMids = {mid0, mid1, mid2}`
+3. 공유 해제: `_pushedMids`에서 mid2 삭제, `/renegotiate`로 SDP만 전송
+4. 2차 화면 공유: 새 screen만 push (mid3) → `_pushedMids = {mid0, mid1, mid3}`
+5. 수신자: screen 트랙만 새로 구독, audio/video 중복 배포 없음
+
+---
+
 ## 수정된 파일
 - `public/js/sfu/WebRTCManager.js`
 - `public/js/sfu/UIManager.js`
 
 ## 커밋
 - `dd63c56` - fix(sfu): fix repeated screen share failure and add single-share lock
-- (미커밋) - fix(sfu): fix receiver not displaying re-shared screen stream
+- `f7beb23` - fix(sfu): fix receiver not displaying re-shared screen stream
+- (미커밋) - fix(sfu): prevent duplicate track push by sending only new tracks to SFU
