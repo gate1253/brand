@@ -149,12 +149,10 @@ class WebRTCManager {
                     });
                 }
 
-                if (data.sessionDescription) {
-                    await this.pc.setRemoteDescription(
-                        new RTCSessionDescription(data.sessionDescription)
-                    );
+                const answerSdp = this._extractSdp(data);
+                if (answerSdp) {
+                    await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
                 }
-                await this._waitForStableSignalingState();
             } else {
                 // No new tracks — SDP-only update via /renegotiate
                 // (e.g. screen transceiver went inactive)
@@ -164,12 +162,10 @@ class WebRTCManager {
                     body: JSON.stringify({ sessionDescription })
                 });
                 const data = await res.json();
-                if (data.sessionDescription) {
-                    await this.pc.setRemoteDescription(
-                        new RTCSessionDescription(data.sessionDescription)
-                    );
+                const answerSdp = this._extractSdp(data);
+                if (answerSdp) {
+                    await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
                 }
-                await this._waitForStableSignalingState();
             }
 
             this.pc.getTransceivers().forEach(t => {
@@ -281,9 +277,10 @@ class WebRTCManager {
             // when the server explicitly requires it.
             if (data.requiresImmediateRenegotiation) {
                 const existingMids = new Set(this.transceiversMap.keys());
+                const remoteSdp = this._extractSdp(data);
 
                 await this.pc.setRemoteDescription(
-                    new RTCSessionDescription(data.sessionDescription)
+                    new RTCSessionDescription(remoteSdp)
                 );
 
                 // Fallback: if no mids from server, map new recvonly transceivers by order
@@ -310,7 +307,6 @@ class WebRTCManager {
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
                 await this._sendRenegotiateAnswer(callsSessionId);
-                await this._waitForStableSignalingState();
             }
 
             this._processDeferredOnTrackEvents();
@@ -346,25 +342,17 @@ class WebRTCManager {
     }
 
     /**
-     * Wait for the PeerConnection signaling state to become "stable".
-     * Mirrors Cloudflare partytracks' signalingStateIsStable() helper.
+     * Extract SDP from server response, handling both formats:
+     * { sessionDescription: { type, sdp } } or { type, sdp }
      */
-    _waitForStableSignalingState() {
-        if (!this.pc || this.pc.signalingState === 'stable') return Promise.resolve();
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                this.pc.removeEventListener('signalingstatechange', handler);
-                reject(new Error('Signaling state did not stabilize within 5s'));
-            }, 5000);
-            const handler = () => {
-                if (this.pc.signalingState === 'stable') {
-                    this.pc.removeEventListener('signalingstatechange', handler);
-                    clearTimeout(timeout);
-                    resolve();
-                }
-            };
-            this.pc.addEventListener('signalingstatechange', handler);
-        });
+    _extractSdp(data) {
+        if (data.sessionDescription && data.sessionDescription.sdp) {
+            return data.sessionDescription;
+        }
+        if (data.sdp) {
+            return { type: data.type || 'answer', sdp: data.sdp };
+        }
+        return null;
     }
 
     /**
