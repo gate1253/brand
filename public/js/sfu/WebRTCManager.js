@@ -133,9 +133,6 @@ class WebRTCManager {
                  }
             });
 
-            console.info('[PUSH-DEBUG] newTracks:', newTracks.length, newTracks.map(t => t.trackName));
-            console.info('[PUSH-DEBUG] signalingState:', this.pc.signalingState);
-
             if (newTracks.length > 0) {
                 // Push new tracks via /tracks/new (always include full SDP)
                 const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
@@ -144,11 +141,6 @@ class WebRTCManager {
                     body: JSON.stringify({ sessionDescription, tracks: newTracks })
                 });
                 const data = await res.json();
-                console.info('[PUSH-DEBUG] /tracks/new 응답 status:', res.status);
-                console.info('[PUSH-DEBUG] sessionDescription.type:', data.sessionDescription?.type);
-                console.info('[PUSH-DEBUG] requiresImmediateRenegotiation:', data.requiresImmediateRenegotiation);
-                console.info('[PUSH-DEBUG] 응답 키:', Object.keys(data));
-
                 if (!res.ok) throw new Error(data.errorDescription || 'Renegotiation failed');
 
                 newTracks.forEach(t => this._pushedMids.add(t.mid));
@@ -166,28 +158,18 @@ class WebRTCManager {
                 }
 
                 const answerSdp = this._extractSdp(data);
-                console.info('[PUSH-DEBUG] answerSdp extracted:', !!answerSdp, answerSdp?.type);
                 if (answerSdp) {
                     await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
-                    console.info('[PUSH-DEBUG] setRemoteDescription 완료, signalingState:', this.pc.signalingState);
-                } else {
-                    console.error('[PUSH-DEBUG] ❌ SDP 추출 실패! data.sessionDescription:', !!data.sessionDescription, 'data.sdp:', !!data.sdp);
                 }
             } else {
                 // No new tracks — SDP-only update via /renegotiate
-                // (e.g. screen transceiver went inactive)
-                console.info('[PUSH-DEBUG] SDP-only /renegotiate (no new tracks)');
                 const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sessionDescription })
                 });
                 const data = await res.json();
-                console.info('[PUSH-DEBUG] /renegotiate 응답 status:', res.status, 'body:', JSON.stringify(data).substring(0, 200));
-                if (!res.ok) {
-                    console.error('[PUSH-DEBUG] ❌ /renegotiate 실패:', res.status);
-                    return; // Don't throw — let the queue continue
-                }
+                if (!res.ok) return;
                 const answerSdp = this._extractSdp(data);
                 if (answerSdp) {
                     await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
@@ -273,28 +255,18 @@ class WebRTCManager {
         this.pendingRemoteTracks = [];
 
         try {
-            const pullRequestBody = {
-                tracks: tracksToProcess.map(t => {
-                    const entry = { location: 'remote', sessionId: t.sessionId, trackName: t.trackName };
-                    if (t.simulcastRid) entry.simulcastRid = t.simulcastRid;
-                    return entry;
-                })
-            };
-            console.info('[PULL-DEBUG] ① /tracks/new 요청:', JSON.stringify(pullRequestBody));
-            console.info('[PULL-DEBUG] ① signalingState:', this.pc.signalingState);
-
             const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pullRequestBody)
+                body: JSON.stringify({
+                    tracks: tracksToProcess.map(t => {
+                        const entry = { location: 'remote', sessionId: t.sessionId, trackName: t.trackName };
+                        if (t.simulcastRid) entry.simulcastRid = t.simulcastRid;
+                        return entry;
+                    })
+                })
             });
             const data = await res.json();
-            console.info('[PULL-DEBUG] ② /tracks/new 응답 status:', res.status);
-            console.info('[PULL-DEBUG] ② requiresImmediateRenegotiation:', data.requiresImmediateRenegotiation);
-            console.info('[PULL-DEBUG] ② sessionDescription.type:', data.sessionDescription?.type);
-            console.info('[PULL-DEBUG] ② tracks:', JSON.stringify(data.tracks));
-            console.info('[PULL-DEBUG] ② 전체 응답 키:', Object.keys(data));
-
             if (!res.ok) throw new Error(data.errorDescription || 'Subscription failed');
 
             // Map returned track metadata (mid assignments from server)
@@ -312,15 +284,12 @@ class WebRTCManager {
             // Following Cloudflare partytracks pattern: only renegotiate
             // when the server explicitly requires it.
             if (data.requiresImmediateRenegotiation) {
-                console.info('[PULL-DEBUG] ③ renegotiation 필요 — SDP 교환 시작');
                 const existingMids = new Set(this.transceiversMap.keys());
                 const remoteSdp = this._extractSdp(data);
-                console.info('[PULL-DEBUG] ③ remoteSdp.type:', remoteSdp?.type);
 
                 await this.pc.setRemoteDescription(
                     new RTCSessionDescription(remoteSdp)
                 );
-                console.info('[PULL-DEBUG] ④ setRemoteDescription 완료, signalingState:', this.pc.signalingState);
 
                 // Fallback: if no mids from server, map new recvonly transceivers by order
                 if (!data.tracks || !data.tracks.some(t => t.mid)) {
@@ -345,11 +314,7 @@ class WebRTCManager {
 
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
-                console.info('[PULL-DEBUG] ⑤ answer 생성 완료, signalingState:', this.pc.signalingState);
                 await this._sendRenegotiateAnswer(callsSessionId);
-                console.info('[PULL-DEBUG] ⑥ /renegotiate 완료, signalingState:', this.pc.signalingState);
-            } else {
-                console.info('[PULL-DEBUG] ③ renegotiation 불필요 (requiresImmediateRenegotiation=false)');
             }
 
             this._processDeferredOnTrackEvents();
@@ -366,30 +331,21 @@ class WebRTCManager {
      * Extracted to avoid duplication across pull-track code paths.
      */
     async _sendRenegotiateAnswer(callsSessionId) {
-        const answerSdp = this.pc.localDescription.sdp;
-        console.info('[RENEG-DEBUG] /renegotiate 요청 — type: answer, sdp 길이:', answerSdp?.length);
-        console.info('[RENEG-DEBUG] signalingState:', this.pc.signalingState);
-        console.info('[RENEG-DEBUG] localDescription.type:', this.pc.localDescription?.type);
-        console.info('[RENEG-DEBUG] currentLocalDescription.type:', this.pc.currentLocalDescription?.type);
-
         const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 sessionDescription: {
                     type: 'answer',
-                    sdp: answerSdp
+                    sdp: this.pc.localDescription.sdp
                 }
             })
         });
 
-        const responseBody = await res.json().catch(() => ({}));
-        console.info('[RENEG-DEBUG] /renegotiate 응답 status:', res.status);
-        console.info('[RENEG-DEBUG] 응답 body:', JSON.stringify(responseBody));
-
         if (!res.ok) {
-            console.error('[RENEG-DEBUG] ❌ /renegotiate 실패:', res.status, responseBody.errorDescription || '');
-            throw new Error(responseBody.errorDescription || `Renegotiation failed (${res.status})`);
+            const data = await res.json().catch(() => ({}));
+            console.error('[WebRTCManager] /renegotiate failed:', res.status, data.errorDescription || '');
+            throw new Error(data.errorDescription || `Renegotiation failed (${res.status})`);
         }
     }
 
@@ -619,7 +575,7 @@ class WebRTCManager {
             });
 
             if (midsToClose.length === 0) return;
-            console.info('[WebRTCManager] Closing screen track mids:', midsToClose);
+            console.info('[WebRTCManager] closeScreenTrack mids:', midsToClose);
 
             const offer = await this.pc.createOffer();
             await this.pc.setLocalDescription(offer);
@@ -638,7 +594,6 @@ class WebRTCManager {
             });
 
             const data = await res.json();
-            console.info('[WebRTCManager] /tracks/close response:', res.status);
 
             if (res.ok) {
                 const answerSdp = this._extractSdp(data);
