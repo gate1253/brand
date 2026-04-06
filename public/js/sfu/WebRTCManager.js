@@ -9,6 +9,7 @@ class WebRTCManager {
         this.pendingRemoteTracks = [];
         this.isRenegotiating = false;
         this.negotiationQueue = false;
+        this._deferredOnTrackEvents = [];
     }
 
     getTrackName(track) {
@@ -30,6 +31,10 @@ class WebRTCManager {
             console.info('[WebRTCManager] pc.ontrack:', mid, info, event.track.kind);
             if (info && info.location === 'remote') {
                 this.app.uiManager.setupRemoteVideo(info, event.track, this.remoteStreams);
+            } else {
+                // Track arrived before transceiversMap was populated (race condition during SRD)
+                console.warn('[WebRTCManager] ontrack: no mapping for mid', mid, '— deferring');
+                this._deferredOnTrackEvents.push({ mid, track: event.track, transceiver: event.transceiver });
             }
         };
 
@@ -137,14 +142,16 @@ class WebRTCManager {
                 }
             });
 
+            this._processDeferredOnTrackEvents();
+
             if (this.app.signalingClient && this.app.signalingClient.isOpen()) {
                 console.info('[WebRTCManager] Sending tracks-update after renegotiate');
-                this.app.signalingClient.send({ 
-                    type: 'tracks-update', 
-                    sessionId: callsSessionId, 
-                    clientId: callsSessionId, 
-                    tracks: localTracksInfo, 
-                    room: this.app.targetCode 
+                this.app.signalingClient.send({
+                    type: 'tracks-update',
+                    sessionId: callsSessionId,
+                    clientId: callsSessionId,
+                    tracks: localTracksInfo,
+                    room: this.app.targetCode
                 });
             }
         } catch (e) {
@@ -254,6 +261,7 @@ class WebRTCManager {
                                 sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
                             })
                         });
+                        this._processDeferredOnTrackEvents();
                         return; // Early return since we already completed the negotiation
                     }
                 } else {
@@ -287,20 +295,22 @@ class WebRTCManager {
                             sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
                         })
                     });
+                    this._processDeferredOnTrackEvents();
                     return;
                 }
 
                 await this.pc.setRemoteDescription(new RTCSessionDescription(data.sessionDescription));
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
-                
+
                 await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         sessionDescription: { type: 'answer', sdp: this.pc.localDescription.sdp }
                     })
                 });
+                this._processDeferredOnTrackEvents();
             }
         } catch (e) {
             console.error('[WebRTCManager] Subscription Error:', e);
@@ -436,13 +446,34 @@ class WebRTCManager {
         this._currentPreferredRid = desiredRid;
     }
     
+    /**
+     * Process deferred ontrack events that arrived before transceiversMap was populated.
+     * Called after transceiversMap updates in processPendingTracks and renegotiate.
+     */
+    _processDeferredOnTrackEvents() {
+        if (this._deferredOnTrackEvents.length === 0) return;
+        const remaining = [];
+        for (const evt of this._deferredOnTrackEvents) {
+            const mid = evt.transceiver.mid || evt.mid;
+            const info = this.transceiversMap.get(mid);
+            if (info && info.location === 'remote') {
+                console.info('[WebRTCManager] Processing deferred ontrack for mid:', mid, info.trackName);
+                this.app.uiManager.setupRemoteVideo(info, evt.track, this.remoteStreams);
+            } else {
+                remaining.push(evt);
+            }
+        }
+        this._deferredOnTrackEvents = remaining;
+    }
+
     stopScreenTransceiver() {
         this.pc.getTransceivers().forEach(t => {
             const mapped = this.transceiversMap.get(t.mid);
             if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
                 t.direction = 'inactive';
                 t.sender.replaceTrack(null);
-                this.transceiversMap.delete(t.mid);
+                // Keep mapping with inactive flag so transceiver can be reused later
+                mapped._inactive = true;
             }
         });
     }

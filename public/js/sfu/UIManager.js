@@ -59,9 +59,10 @@ class UIManager {
                     pc.getTransceivers().forEach(t => {
                         if (reused) return;
                         const mapped = this.app.webrtcManager.transceiversMap.get(t.mid);
-                        if (mapped && mapped.trackName === 'screen' && t.direction === 'inactive') {
+                        if (mapped && mapped.trackName === 'screen' && mapped._inactive && t.direction === 'inactive') {
                             t.direction = 'sendonly';
                             t.sender.replaceTrack(stream.getVideoTracks()[0]);
+                            delete mapped._inactive;
                             reused = true;
                         }
                     });
