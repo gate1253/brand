@@ -296,6 +296,7 @@ class UIManager {
         const blocked = !isLocalSharing && this.app.webrtcManager.isRemoteScreenSharing();
         this.toggleScreenBtn.disabled = blocked;
         this.toggleScreenBtn.classList.toggle('disabled', blocked);
+        this.toggleScreenBtn.style.display = blocked ? 'none' : '';
     }
 
     _showScreenShareBlockedToast() {
