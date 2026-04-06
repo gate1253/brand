@@ -35,6 +35,13 @@ class UIManager {
         };
 
         this.toggleScreenBtn.onclick = async () => {
+            // Block if a remote participant is already sharing
+            const isLocalSharing = !!this.app.mediaManager.screenStream;
+            if (!isLocalSharing && this.app.webrtcManager.isRemoteScreenSharing()) {
+                this._showScreenShareBlockedToast();
+                return;
+            }
+
             try {
                 const { active, stream } = await this.app.mediaManager.toggleScreen();
 
@@ -53,22 +60,11 @@ class UIManager {
                     // Add local preview
                     this.renderLocalScreenPreview(stream);
 
-                    // Reuse an existing inactive screen transceiver if available
+                    // Always create a fresh transceiver for screen share.
+                    // Reusing an inactive transceiver causes the SFU to not
+                    // properly re-publish the track on subsequent shares.
                     const pc = this.app.webrtcManager.pc;
-                    let reused = false;
-                    pc.getTransceivers().forEach(t => {
-                        if (reused) return;
-                        const mapped = this.app.webrtcManager.transceiversMap.get(t.mid);
-                        if (mapped && mapped.trackName === 'screen' && mapped._inactive && t.direction === 'inactive') {
-                            t.direction = 'sendonly';
-                            t.sender.replaceTrack(stream.getVideoTracks()[0]);
-                            delete mapped._inactive;
-                            reused = true;
-                        }
-                    });
-                    if (!reused) {
-                        pc.addTransceiver(stream.getVideoTracks()[0], { direction: 'sendonly' });
-                    }
+                    pc.addTransceiver(stream.getVideoTracks()[0], { direction: 'sendonly' });
                     await this.app.webrtcManager.renegotiate();
                 }
             } catch (e) {
@@ -276,6 +272,32 @@ class UIManager {
             }
         `;
         document.head.appendChild(style);
+    }
+
+    updateScreenShareLock() {
+        const isLocalSharing = !!this.app.mediaManager.screenStream;
+        const blocked = !isLocalSharing && this.app.webrtcManager.isRemoteScreenSharing();
+        this.toggleScreenBtn.disabled = blocked;
+        this.toggleScreenBtn.classList.toggle('disabled', blocked);
+    }
+
+    _showScreenShareBlockedToast() {
+        let toast = document.getElementById('screen-share-toast');
+        if (toast) toast.remove();
+        toast = document.createElement('div');
+        toast.id = 'screen-share-toast';
+        toast.textContent = 'Someone is already sharing their screen';
+        Object.assign(toast.style, {
+            position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.85)', color: '#fff', padding: '10px 20px',
+            borderRadius: '8px', fontSize: '14px', zIndex: '9999',
+            transition: 'opacity 0.3s', opacity: '1'
+        });
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 2500);
     }
 
     handleSpeakerUpdate(sessionId, isSpeaking) {

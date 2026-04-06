@@ -15,6 +15,9 @@ class WebRTCManager {
         this._taskQueue = Promise.resolve();
         this._renegotiateScheduled = false;
         this._pullScheduled = false;
+
+        // Track who is currently screen-sharing (null = nobody)
+        this._remoteScreenSharerSid = null;
     }
 
     /**
@@ -344,6 +347,15 @@ class WebRTCManager {
         // Build a set of all track names advertised by this remote peer
         const currentRemoteTracks = new Set(msg.tracks.map(t => sid + ':' + t.trackName));
 
+        // Track remote screen share state
+        const hasScreen = msg.tracks.some(t => t.trackName === 'screen');
+        if (hasScreen) {
+            this._remoteScreenSharerSid = sid;
+        } else if (this._remoteScreenSharerSid === sid) {
+            this._remoteScreenSharerSid = null;
+        }
+        this.app.uiManager.updateScreenShareLock();
+
         msg.tracks.forEach(t => {
             const key = sid + ':' + t.trackName;
             if (!this.subscribedTracks.has(key)) {
@@ -402,12 +414,18 @@ class WebRTCManager {
         const sid = msg.sessionId || msg.clientId;
         if (!sid) return;
         console.info('[WebRTCManager] handleRemoteLeave from:', sid);
+
+        if (this._remoteScreenSharerSid === sid) {
+            this._remoteScreenSharerSid = null;
+            this.app.uiManager.updateScreenShareLock();
+        }
+
         for (let key of Array.from(this.subscribedTracks)) {
             if (key.startsWith(sid + ':')) {
                 this.subscribedTracks.delete(key);
             }
         }
-        
+
         this.app.uiManager.removeAllRemoteContainers(sid, this.remoteStreams);
         
         this.pc.getTransceivers().forEach(t => {
@@ -481,14 +499,18 @@ class WebRTCManager {
         this._deferredOnTrackEvents = remaining;
     }
 
+    isRemoteScreenSharing() {
+        return this._remoteScreenSharerSid !== null;
+    }
+
     stopScreenTransceiver() {
         this.pc.getTransceivers().forEach(t => {
             const mapped = this.transceiversMap.get(t.mid);
             if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
                 t.direction = 'inactive';
                 t.sender.replaceTrack(null);
-                // Keep mapping with inactive flag so transceiver can be reused later
-                mapped._inactive = true;
+                // Remove mapping entirely — we will create a fresh transceiver next time
+                this.transceiversMap.delete(t.mid);
             }
         });
     }
