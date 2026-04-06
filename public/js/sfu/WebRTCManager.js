@@ -600,14 +600,74 @@ class WebRTCManager {
         return this._remoteScreenSharerSid !== null;
     }
 
-    stopScreenTransceiver() {
-        this.pc.getTransceivers().forEach(t => {
-            const mapped = this.transceiversMap.get(t.mid);
-            if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
-                t.direction = 'inactive';
-                t.sender.replaceTrack(null);
-                this._pushedMids.delete(t.mid);
-                this.transceiversMap.delete(t.mid);
+    /**
+     * Close the screen share track via /tracks/close (Cloudflare partytracks pattern).
+     * This replaces the old stopScreenTransceiver + renegotiate combo that caused 406.
+     */
+    async closeScreenTrack() {
+        return this._enqueue(async () => {
+            const callsSessionId = this.app.callsSessionId;
+            if (!this.pc || !callsSessionId) return;
+
+            const midsToClose = [];
+            this.pc.getTransceivers().forEach(t => {
+                const mapped = this.transceiversMap.get(t.mid);
+                if (mapped && mapped.location === 'local' && mapped.trackName === 'screen') {
+                    midsToClose.push(t.mid);
+                    t.stop();
+                }
+            });
+
+            if (midsToClose.length === 0) return;
+            console.info('[WebRTCManager] Closing screen track mids:', midsToClose);
+
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+
+            const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/close`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tracks: midsToClose.map(mid => ({ mid })),
+                    sessionDescription: {
+                        type: 'offer',
+                        sdp: this.pc.localDescription.sdp
+                    },
+                    force: false
+                })
+            });
+
+            const data = await res.json();
+            console.info('[WebRTCManager] /tracks/close response:', res.status);
+
+            if (res.ok) {
+                const answerSdp = this._extractSdp(data);
+                if (answerSdp) {
+                    await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+                }
+            }
+
+            // Clean up maps
+            midsToClose.forEach(mid => {
+                this._pushedMids.delete(mid);
+                this.transceiversMap.delete(mid);
+            });
+
+            // Broadcast updated tracks
+            if (this.app.signalingClient && this.app.signalingClient.isOpen()) {
+                const localTracksInfo = [];
+                this.pc.getTransceivers().forEach(t => {
+                    if ((t.direction === 'sendonly' || t.direction === 'sendrecv') && t.sender.track) {
+                        localTracksInfo.push({ trackName: this.getTrackName(t.sender.track), mid: t.mid });
+                    }
+                });
+                this.app.signalingClient.send({
+                    type: 'tracks-update',
+                    sessionId: callsSessionId,
+                    clientId: callsSessionId,
+                    tracks: localTracksInfo,
+                    room: this.app.targetCode
+                });
             }
         });
     }

@@ -47,13 +47,13 @@ class UIManager {
 
                 if (!active) {
                     this.toggleScreenBtn.classList.remove('active');
-                    this.app.webrtcManager.stopScreenTransceiver();
 
                     // Remove local preview
                     const localScreenContainer = document.getElementById('container-local-screen');
                     if (localScreenContainer) localScreenContainer.remove();
 
-                    await this.app.webrtcManager.renegotiate();
+                    // Close via /tracks/close (not renegotiate)
+                    await this.app.webrtcManager.closeScreenTrack();
                 } else {
                     this.toggleScreenBtn.classList.add('active');
 
