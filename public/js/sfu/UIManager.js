@@ -50,7 +50,10 @@ class UIManager {
 
                     // Remove local preview
                     const localScreenContainer = document.getElementById('container-local-screen');
-                    if (localScreenContainer) localScreenContainer.remove();
+                    if (localScreenContainer) {
+                        localScreenContainer.remove();
+                        this.updateGridLayout();
+                    }
 
                     // Close via /tracks/close (not renegotiate)
                     await this.app.webrtcManager.closeScreenTrack();
@@ -133,8 +136,9 @@ class UIManager {
                 <video id="localScreenVideo" autoplay playsinline muted></video>
                 <div class="label">My Screen Share (Preview)</div>`;
             this.videoGrid.appendChild(container);
+            this.updateGridLayout();
         }
-        
+
         const video = document.getElementById('localScreenVideo');
         if (video) {
             video.srcObject = stream;
@@ -157,6 +161,7 @@ class UIManager {
             <div class="label">${isScreen ? 'Screen Share' : 'Participant'}</div>`;
 
         this.videoGrid.appendChild(container);
+        this.updateGridLayout();
         return container;
     }
 
@@ -243,7 +248,10 @@ class UIManager {
             let id = 'container-' + sid;
             if (trackName === 'screen') id += '-screen';
             const el = document.getElementById(id);
-            if (el) el.remove();
+            if (el) {
+                el.remove();
+                this.updateGridLayout();
+            }
             remoteStreamsMap.delete(streamId);
         }
 
@@ -262,6 +270,23 @@ class UIManager {
         containers.forEach(c => c.remove());
         remoteStreamsMap.delete(sid);
         remoteStreamsMap.delete(sid + '-screen');
+        this.updateGridLayout();
+    }
+
+    /**
+     * Dynamically adjust grid columns based on participant count.
+     * Ensures a square-ish layout so faces remain visible even with many participants.
+     */
+    updateGridLayout() {
+        const count = this.videoGrid.children.length;
+        let columns;
+        if (count <= 1) columns = 1;
+        else if (count <= 4) columns = 2;
+        else if (count <= 9) columns = 3;
+        else if (count <= 16) columns = 4;
+        else columns = 5;
+
+        this.videoGrid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
     }
 
     _injectSpeakingStyles() {

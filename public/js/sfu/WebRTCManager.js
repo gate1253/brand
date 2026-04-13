@@ -9,26 +9,23 @@ class WebRTCManager {
         this.pendingRemoteTracks = [];
         this._deferredOnTrackEvents = [];
 
-        // Serialized task queue: guarantees that all Calls API interactions
-        // (push via renegotiate, pull via processPendingTracks, answer via /renegotiate)
-        // execute strictly one-at-a-time, preventing 406 "push and pull in same request" errors.
+        // FIFOScheduler pattern (from partytracks): guarantees strict
+        // serial execution of all Calls API interactions.
         this._taskQueue = Promise.resolve();
-        this._renegotiateScheduled = false;
+
+        // Coalesce flags
+        this._pushScheduled = false;
         this._pullScheduled = false;
 
         // Track who is currently screen-sharing (null = nobody)
         this._remoteScreenSharerSid = null;
 
-        // Mids that have already been pushed to the SFU via /tracks/new.
-        // Only genuinely new tracks should be sent; re-sending existing ones
-        // causes the SFU to create duplicate track distributions.
+        // Mids already pushed to SFU via /tracks/new.
         this._pushedMids = new Set();
     }
 
-    /**
-     * Enqueue an async task so it runs after all previously queued tasks complete.
-     * Returns a promise that resolves when this task finishes.
-     */
+    // ── FIFOScheduler ─────────────────────────────────────────────
+
     _enqueue(fn) {
         const task = this._taskQueue.then(fn).catch(e => {
             console.error('[WebRTCManager] Queued task error:', e);
@@ -37,12 +34,52 @@ class WebRTCManager {
         return task;
     }
 
+    // ── signalingStateIsStable (partytracks pattern) ──────────────
+    // After every push/pull/close, wait for the PeerConnection to
+    // reach "stable" before allowing the next queued task to proceed.
+
+    _waitForStableSignaling(timeoutMs = 5000) {
+        return new Promise((resolve, reject) => {
+            if (!this.pc || this.pc.signalingState === 'stable') {
+                resolve();
+                return;
+            }
+            const timeout = setTimeout(() => {
+                this.pc.removeEventListener('signalingstatechange', handler);
+                reject(new Error('Signaling state did not stabilize within ' + timeoutMs + 'ms'));
+            }, timeoutMs);
+
+            const handler = () => {
+                if (this.pc.signalingState === 'stable') {
+                    this.pc.removeEventListener('signalingstatechange', handler);
+                    clearTimeout(timeout);
+                    resolve();
+                }
+            };
+            this.pc.addEventListener('signalingstatechange', handler);
+        });
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────
+
     getTrackName(track) {
         if (!track) return 'video';
         if (track.kind === 'audio') return 'audio';
         if (this.app.mediaManager.screenStream && this.app.mediaManager.screenStream.getVideoTracks().includes(track)) return 'screen';
         return 'video';
     }
+
+    _extractSdp(data) {
+        if (data.sessionDescription && data.sessionDescription.sdp) {
+            return data.sessionDescription;
+        }
+        if (data.sdp) {
+            return { type: data.type || 'answer', sdp: data.sdp };
+        }
+        return null;
+    }
+
+    // ── Init ──────────────────────────────────────────────────────
 
     async init(localStream) {
         this.pc = new RTCPeerConnection({
@@ -57,7 +94,6 @@ class WebRTCManager {
             if (info && info.location === 'remote') {
                 this.app.uiManager.setupRemoteVideo(info, event.track, this.remoteStreams);
             } else {
-                // Track arrived before transceiversMap was populated (race condition during SRD)
                 console.warn('[WebRTCManager] ontrack: no mapping for mid', mid, '— deferring');
                 this._deferredOnTrackEvents.push({ mid, track: event.track, transceiver: event.transceiver });
             }
@@ -81,119 +117,94 @@ class WebRTCManager {
         }
     }
 
-    async renegotiate() {
+    // ── Push: local tracks → SFU via /tracks/new (partytracks pattern) ──
+    // Always sends offer SDP + local tracks. /renegotiate is NEVER used
+    // for offers — only for sending answers after a pull.
+
+    async pushLocalTracks() {
         if (!this.pc || !this.app.callsSessionId) return;
-        if (this._renegotiateScheduled) return;
-        this._renegotiateScheduled = true;
+        if (this._pushScheduled) return;
+        this._pushScheduled = true;
 
         return this._enqueue(async () => {
-            this._renegotiateScheduled = false;
+            this._pushScheduled = false;
             const callsSessionId = this.app.callsSessionId;
             if (!this.pc || !callsSessionId) return;
 
-            // Ensure PC is in stable state before starting a new negotiation.
-            // If a previous renegotiate left the PC in have-local-offer (e.g. due
-            // to a concurrent stopScreenTransceiver modifying transceivers), roll back.
-            if (this.pc.signalingState !== 'stable') {
-                console.warn('[WebRTCManager] renegotiate: signalingState is', this.pc.signalingState, '— rolling back');
-                await this.pc.setLocalDescription({ type: 'rollback' });
-            }
-
-            const offer = await this.pc.createOffer();
-            await this.pc.setLocalDescription(offer);
-
-            const sessionDescription = {
-                type: this.pc.localDescription.type,
-                sdp: this.pc.localDescription.sdp
-            };
+            // Collect new (unpushed) local tracks
             const newTracks = [];
             const localTracksInfo = [];
 
             this.pc.getTransceivers().forEach(t => {
-                 if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
-                     const trackName = this.getTrackName(t.sender.track);
-                     localTracksInfo.push({ trackName, mid: t.mid, simulcast: false });
-                     this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
+                if (t.direction === 'sendonly' || t.direction === 'sendrecv') {
+                    const trackName = this.getTrackName(t.sender.track);
+                    localTracksInfo.push({ trackName, mid: t.mid, simulcast: false });
+                    this.transceiversMap.set(t.mid, { location: 'local', trackName, sessionId: callsSessionId });
 
-                     if (!this._pushedMids.has(t.mid)) {
-                         const trackEntry = { location: 'local', mid: t.mid, trackName };
-                         if (t.sender.track && t.sender.track.kind === 'video' && trackName !== 'screen') {
-                             const params = t.sender.getParameters();
-                             if (params.encodings && params.encodings.length > 1) {
-                                 trackEntry.simulcastEncodings = params.encodings.map(enc => ({
-                                     rid: enc.rid,
-                                     maxBitrate: enc.maxBitrate,
-                                     scaleResolutionDownBy: enc.scaleResolutionDownBy
-                                 }));
-                                 localTracksInfo[localTracksInfo.length - 1].simulcast = true;
-                             }
-                         }
-                         newTracks.push(trackEntry);
-                     }
-                 }
-            });
-
-            if (newTracks.length > 0) {
-                // Push new tracks via /tracks/new (always include full SDP)
-                const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionDescription, tracks: newTracks })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.errorDescription || 'Renegotiation failed');
-
-                newTracks.forEach(t => this._pushedMids.add(t.mid));
-
-                if (data.tracks) {
-                    data.tracks.forEach(t => {
-                        if (t.mid && !this._pushedMids.has(t.mid)) {
-                            this.transceiversMap.set(t.mid, {
-                                location: t.location || 'remote',
-                                sessionId: t.sessionId,
-                                trackName: t.trackName
-                            });
+                    if (!this._pushedMids.has(t.mid)) {
+                        const trackEntry = { location: 'local', mid: t.mid, trackName };
+                        if (t.sender.track && t.sender.track.kind === 'video' && trackName !== 'screen') {
+                            const params = t.sender.getParameters();
+                            if (params.encodings && params.encodings.length > 1) {
+                                trackEntry.simulcastEncodings = params.encodings.map(enc => ({
+                                    rid: enc.rid,
+                                    maxBitrate: enc.maxBitrate,
+                                    scaleResolutionDownBy: enc.scaleResolutionDownBy
+                                }));
+                                localTracksInfo[localTracksInfo.length - 1].simulcast = true;
+                            }
                         }
-                    });
-                }
-
-                const answerSdp = this._extractSdp(data);
-                if (answerSdp) {
-                    await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
-                }
-            } else {
-                // No new tracks — SDP-only update via /renegotiate
-                const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionDescription })
-                });
-                const data = await res.json();
-                if (!res.ok) return;
-                const answerSdp = this._extractSdp(data);
-                if (answerSdp) {
-                    await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
-                }
-            }
-
-            this.pc.getTransceivers().forEach(t => {
-                if (t.mid && t.direction === 'recvonly' && !this.transceiversMap.has(t.mid)) {
-                    const existingEntry = Array.from(this.transceiversMap.entries()).find(
-                        ([, v]) => v.location === 'remote' && !this.pc.getTransceivers().some(
-                            tr => tr.mid === v.mid
-                        )
-                    );
-                    if (existingEntry) {
-                        const [oldMid, mapping] = existingEntry;
-                        this.transceiversMap.delete(oldMid);
-                        this.transceiversMap.set(t.mid, mapping);
-                        console.info('[WebRTCManager] Remapped stale mid', oldMid, '→', t.mid, mapping.trackName);
+                        newTracks.push(trackEntry);
                     }
                 }
             });
 
+            if (newTracks.length === 0) return; // Nothing to push
+
+            // Create offer and push via /tracks/new
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+
+            const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionDescription: {
+                        type: this.pc.localDescription.type,
+                        sdp: this.pc.localDescription.sdp
+                    },
+                    tracks: newTracks
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.errorDescription || 'Push tracks failed');
+
+            newTracks.forEach(t => this._pushedMids.add(t.mid));
+
+            if (data.tracks) {
+                data.tracks.forEach(t => {
+                    if (t.mid && !this._pushedMids.has(t.mid)) {
+                        this.transceiversMap.set(t.mid, {
+                            location: t.location || 'remote',
+                            sessionId: t.sessionId,
+                            trackName: t.trackName
+                        });
+                    }
+                });
+            }
+
+            // Set answer SDP from server
+            const answerSdp = this._extractSdp(data);
+            if (answerSdp) {
+                await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
+            }
+
+            // Wait for stable signaling state (partytracks pattern)
+            await this._waitForStableSignaling();
+
             this._processDeferredOnTrackEvents();
 
+            // Broadcast track info to other participants
             if (this.app.signalingClient && this.app.signalingClient.isOpen()) {
                 this.app.signalingClient.send({
                     type: 'tracks-update',
@@ -204,41 +215,25 @@ class WebRTCManager {
                 });
             }
 
+            // If remote tracks are pending, schedule a pull
             if (this.pendingRemoteTracks.length > 0) {
                 this._schedulePull();
             }
         });
     }
 
-    broadcastLocalTracks() {
-        const callsSessionId = this.app.callsSessionId;
-        if (!this.pc || !this.app.signalingClient || !this.app.signalingClient.isOpen()) return;
-        
-        console.info('[WebRTCManager] Broadcasting local tracks');
-        const localTracksInfo = [];
-        this.pc.getTransceivers().forEach(t => {
-            if ((t.direction === 'sendonly' || t.direction === 'sendrecv') && t.sender.track) {
-                const trackName = this.getTrackName(t.sender.track);
-                localTracksInfo.push({ trackName, mid: t.mid });
-            }
-        });
-        
-        this.app.signalingClient.send({ 
-            type: 'tracks-update', 
-            sessionId: callsSessionId, 
-            clientId: callsSessionId, 
-            tracks: localTracksInfo, 
-            room: this.app.targetCode 
-        });
-    }
+    // ── Pull: subscribe to remote tracks (partytracks pattern) ────
+    // 1. POST /tracks/new with remote tracks (NO SDP)
+    // 2. If requiresImmediateRenegotiation:
+    //    - setRemoteDescription(offer from server)
+    //    - createAnswer → setLocalDescription
+    //    - PUT /renegotiate with answer
+    //    - wait for stable
 
-    /**
-     * Schedule a pull task on the queue. Coalesces multiple rapid calls into one.
-     */
     _schedulePull() {
         if (this._pullScheduled) return;
         this._pullScheduled = true;
-        this._enqueue(() => this._processPendingTracksInner());
+        this._enqueue(() => this._pullTracksInner());
     }
 
     async processPendingTracks() {
@@ -246,7 +241,7 @@ class WebRTCManager {
         this._schedulePull();
     }
 
-    async _processPendingTracksInner() {
+    async _pullTracksInner() {
         this._pullScheduled = false;
         const callsSessionId = this.app.callsSessionId;
         if (!this.pc || !callsSessionId || this.pendingRemoteTracks.length === 0) return;
@@ -255,6 +250,8 @@ class WebRTCManager {
         this.pendingRemoteTracks = [];
 
         try {
+            // Step 1: POST /tracks/new with remote tracks only (NO SDP — partytracks pattern)
+            const existingMids = new Set(this.transceiversMap.keys());
             const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/tracks/new`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -269,7 +266,7 @@ class WebRTCManager {
             const data = await res.json();
             if (!res.ok) throw new Error(data.errorDescription || 'Subscription failed');
 
-            // Map returned track metadata (mid assignments from server)
+            // Map returned track metadata
             if (data.tracks && data.tracks.length > 0) {
                 data.tracks.forEach(t => {
                     if (t.mid) {
@@ -281,15 +278,12 @@ class WebRTCManager {
                 });
             }
 
-            // Following Cloudflare partytracks pattern: only renegotiate
-            // when the server explicitly requires it.
+            // Step 2: If requiresImmediateRenegotiation, complete the SDP handshake
             if (data.requiresImmediateRenegotiation) {
-                const existingMids = new Set(this.transceiversMap.keys());
                 const remoteSdp = this._extractSdp(data);
 
-                await this.pc.setRemoteDescription(
-                    new RTCSessionDescription(remoteSdp)
-                );
+                // Server sent an offer — set it, create answer, send answer back
+                await this.pc.setRemoteDescription(new RTCSessionDescription(remoteSdp));
 
                 // Fallback: if no mids from server, map new recvonly transceivers by order
                 if (!data.tracks || !data.tracks.some(t => t.mid)) {
@@ -314,22 +308,26 @@ class WebRTCManager {
 
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
+
+                // Step 3: Send answer via /renegotiate (partytracks pattern — answer only)
                 await this._sendRenegotiateAnswer(callsSessionId);
+
+                // Step 4: Wait for stable signaling state
+                await this._waitForStableSignaling();
             }
 
             this._processDeferredOnTrackEvents();
             this._ensurePulledTracksDisplayed(tracksToProcess);
         } catch (e) {
             console.error('[WebRTCManager] Subscription Error:', e);
+            // Re-queue failed tracks for retry
             this.pendingRemoteTracks = [...tracksToProcess, ...this.pendingRemoteTracks];
         }
+
+        // If more tracks arrived while we were processing, drain them
         this._drainIfPending();
     }
 
-    /**
-     * Send the local answer SDP back to Cloudflare via /renegotiate.
-     * Extracted to avoid duplication across pull-track code paths.
-     */
     async _sendRenegotiateAnswer(callsSessionId) {
         const res = await fetch(this.apiUrl + `/calls/sessions/${callsSessionId}/renegotiate`, {
             method: 'POST',
@@ -349,36 +347,50 @@ class WebRTCManager {
         }
     }
 
-    /**
-     * Extract SDP from server response, handling both formats:
-     * { sessionDescription: { type, sdp } } or { type, sdp }
-     */
-    _extractSdp(data) {
-        if (data.sessionDescription && data.sessionDescription.sdp) {
-            return data.sessionDescription;
-        }
-        if (data.sdp) {
-            return { type: data.type || 'answer', sdp: data.sdp };
-        }
-        return null;
-    }
-
-    /**
-     * If there are still pending remote tracks after a pull completes,
-     * schedule another pull task on the queue.
-     */
     _drainIfPending() {
         if (this.pendingRemoteTracks.length > 0) {
             this._schedulePull();
         }
     }
 
+    // ── Backward-compatible alias ─────────────────────────────────
+    // SFUApp.start() calls renegotiate() — redirect to pushLocalTracks
+
+    async renegotiate() {
+        return this.pushLocalTracks();
+    }
+
+    // ── Broadcast ─────────────────────────────────────────────────
+
+    broadcastLocalTracks() {
+        const callsSessionId = this.app.callsSessionId;
+        if (!this.pc || !this.app.signalingClient || !this.app.signalingClient.isOpen()) return;
+
+        console.info('[WebRTCManager] Broadcasting local tracks');
+        const localTracksInfo = [];
+        this.pc.getTransceivers().forEach(t => {
+            if ((t.direction === 'sendonly' || t.direction === 'sendrecv') && t.sender.track) {
+                const trackName = this.getTrackName(t.sender.track);
+                localTracksInfo.push({ trackName, mid: t.mid });
+            }
+        });
+
+        this.app.signalingClient.send({
+            type: 'tracks-update',
+            sessionId: callsSessionId,
+            clientId: callsSessionId,
+            tracks: localTracksInfo,
+            room: this.app.targetCode
+        });
+    }
+
+    // ── Remote track handling ─────────────────────────────────────
+
     handleRemoteTracksUpdate(msg) {
         const sid = msg.sessionId || msg.clientId;
         if (!sid) return;
         console.info('[WebRTCManager] handleRemoteTracksUpdate from:', sid, 'tracks:', msg.tracks);
 
-        // Build a set of all track names advertised by this remote peer
         const currentRemoteTracks = new Set(msg.tracks.map(t => sid + ':' + t.trackName));
 
         // Track remote screen share state
@@ -394,8 +406,6 @@ class WebRTCManager {
             const key = sid + ':' + t.trackName;
             if (!this.subscribedTracks.has(key)) {
                 if (!this.pendingRemoteTracks.some(p => p.sessionId === sid && p.trackName === t.trackName)) {
-                    // For simulcast-capable video tracks, request the 'mid' layer by default
-                    // to balance quality and bandwidth in multi-party scenarios
                     const pendingEntry = { sessionId: sid, trackName: t.trackName };
                     if (t.simulcast && t.trackName === 'video') {
                         pendingEntry.simulcastRid = this._selectSimulcastLayer(sid);
@@ -417,20 +427,13 @@ class WebRTCManager {
         if (this.pendingRemoteTracks.length > 0) this.processPendingTracks();
     }
 
-    /**
-     * Select the appropriate simulcast layer based on participant count.
-     * Fewer participants → higher quality; more participants → lower quality.
-     */
     _selectSimulcastLayer(excludeSessionId) {
         const participantCount = this._getRemoteParticipantCount(excludeSessionId);
-        if (participantCount <= 2) return 'h';   // 1-on-1 or small call: high quality
-        if (participantCount <= 4) return 'm';   // medium group: mid quality
-        return 'l';                               // large group: low quality to save bandwidth
+        if (participantCount <= 2) return 'h';
+        if (participantCount <= 4) return 'm';
+        return 'l';
     }
 
-    /**
-     * Count unique remote participants currently subscribed or pending.
-     */
     _getRemoteParticipantCount(excludeSessionId) {
         const sessions = new Set();
         for (const key of this.subscribedTracks) {
@@ -440,7 +443,6 @@ class WebRTCManager {
         for (const entry of this.pendingRemoteTracks) {
             if (entry.sessionId !== excludeSessionId) sessions.add(entry.sessionId);
         }
-        // +1 for the new participant being added
         return sessions.size + 1;
     }
 
@@ -461,7 +463,7 @@ class WebRTCManager {
         }
 
         this.app.uiManager.removeAllRemoteContainers(sid, this.remoteStreams);
-        
+
         this.pc.getTransceivers().forEach(t => {
             const mapped = this.transceiversMap.get(t.mid);
             if (mapped && mapped.sessionId === sid) {
@@ -473,6 +475,8 @@ class WebRTCManager {
 
         this.rebalanceSimulcastLayers();
     }
+
+    // ── Track replacement ─────────────────────────────────────────
 
     async replaceVideoTrack(newTrack) {
         if (!this.pc) return;
@@ -494,11 +498,8 @@ class WebRTCManager {
         this.app.uiManager.updateLocalVideo(newTrack);
     }
 
-    /**
-     * Rebalance simulcast layers for all subscribed video tracks
-     * based on the current number of participants.
-     * Call this when participants join or leave.
-     */
+    // ── Simulcast rebalancing ─────────────────────────────────────
+
     async rebalanceSimulcastLayers() {
         if (!this.pc) return;
         const participantCount = this._getRemoteParticipantCount(null);
@@ -508,15 +509,11 @@ class WebRTCManager {
         else desiredRid = 'l';
 
         console.info('[WebRTCManager] Rebalancing simulcast to rid:', desiredRid, 'participants:', participantCount);
-        // Note: actual layer selection is enforced server-side via the Calls API.
-        // This updates client-side preference for future subscriptions.
         this._currentPreferredRid = desiredRid;
     }
-    
-    /**
-     * Process deferred ontrack events that arrived before transceiversMap was populated.
-     * Called after transceiversMap updates in processPendingTracks and renegotiate.
-     */
+
+    // ── Deferred ontrack handling ─────────────────────────────────
+
     _processDeferredOnTrackEvents() {
         if (this._deferredOnTrackEvents.length === 0) return;
         const remaining = [];
@@ -533,11 +530,6 @@ class WebRTCManager {
         this._deferredOnTrackEvents = remaining;
     }
 
-    /**
-     * After a pull completes, ensure every pulled track is wired to the UI.
-     * Handles the case where the browser reuses an existing transceiver and
-     * does NOT fire pc.ontrack (common on second+ screen-share subscriptions).
-     */
     _ensurePulledTracksDisplayed(tracksToProcess) {
         for (const requested of tracksToProcess) {
             for (const [mid, info] of this.transceiversMap.entries()) {
@@ -556,10 +548,8 @@ class WebRTCManager {
         return this._remoteScreenSharerSid !== null;
     }
 
-    /**
-     * Close the screen share track via /tracks/close (Cloudflare partytracks pattern).
-     * This replaces the old stopScreenTransceiver + renegotiate combo that caused 406.
-     */
+    // ── Close screen track (partytracks pattern) ──────────────────
+
     async closeScreenTrack() {
         return this._enqueue(async () => {
             const callsSessionId = this.app.callsSessionId;
@@ -600,6 +590,8 @@ class WebRTCManager {
                 if (answerSdp) {
                     await this.pc.setRemoteDescription(new RTCSessionDescription(answerSdp));
                 }
+                // Wait for stable (partytracks pattern)
+                await this._waitForStableSignaling();
             }
 
             // Clean up maps
