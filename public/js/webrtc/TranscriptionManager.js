@@ -172,6 +172,9 @@ class TranscriptionManager {
         // Setup AudioContext for mixing remote streams
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         this.audioContext = new AudioCtx({ sampleRate: this.TARGET_SAMPLE_RATE });
+        if (this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
         this.mixedDestination = this.audioContext.createMediaStreamDestination();
 
         // Add all currently connected remote peer streams
@@ -226,17 +229,13 @@ class TranscriptionManager {
                 const overlapSamples = this.TARGET_SAMPLE_RATE * this.OVERLAP_SECONDS;
                 this.audioInputBuffer = this.audioInputBuffer.slice(this.audioInputBuffer.length - overlapSamples);
 
-                // Simple VAD
-                let sum = 0;
-                for (let i = 0; i < rawData.length; i++) sum += rawData[i] * rawData[i];
-                const rms = Math.sqrt(sum / rawData.length);
-
-                // Increased threshold from 0.003 to 0.005 to reduce noise-induced hallucinations
-                if (rms < 0.005) {
-                    console.log('[Transcription] silence or noise (RMS:', rms.toFixed(5), ')');
+                // Reduced threshold to 0.002 to ensure sound is detected even if quiet
+                if (rms < 0.002) {
+                    console.log('[Transcription] silence (RMS:', rms.toFixed(5), ')');
                     return;
                 }
 
+                this.subtitleText.textContent = 'Processing...';
                 console.log('[Transcription] Sending', this.BUFFER_SECONDS, 's buffer with', this.OVERLAP_SECONDS, 's overlap (RMS:', rms.toFixed(5), ')');
                 const wavBuffer = this.encodeWAV(rawData, this.TARGET_SAMPLE_RATE);
                 this.transcriptWs.send(wavBuffer);
