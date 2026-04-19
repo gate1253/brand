@@ -18,6 +18,7 @@ class TranscriptionManager {
         this.audioInputBuffer = [];
         this.subTimeout = null;
         this.BUFFER_SECONDS = 5;
+        this.OVERLAP_SECONDS = 1; // Send 5s every 4s (1s overlap)
         this.TARGET_SAMPLE_RATE = 16000;
 
         this.subtitleOverlay = document.getElementById('subtitleOverlay');
@@ -215,24 +216,28 @@ class TranscriptionManager {
                 this.audioInputBuffer.push(inputData[i]);
             }
 
-            // Buffer for BUFFER_SECONDS (30s) worth of samples
+            // Buffer for BUFFER_SECONDS worth of samples
             const requiredSamples = this.TARGET_SAMPLE_RATE * this.BUFFER_SECONDS;
 
             if (this.audioInputBuffer.length >= requiredSamples) {
                 const rawData = new Float32Array(this.audioInputBuffer);
-                this.audioInputBuffer = [];
+                
+                // Keep the overlap for the next buffer
+                const overlapSamples = this.TARGET_SAMPLE_RATE * this.OVERLAP_SECONDS;
+                this.audioInputBuffer = this.audioInputBuffer.slice(this.audioInputBuffer.length - overlapSamples);
 
                 // Simple VAD
                 let sum = 0;
                 for (let i = 0; i < rawData.length; i++) sum += rawData[i] * rawData[i];
                 const rms = Math.sqrt(sum / rawData.length);
 
-                if (rms < 0.003) {
-                    console.log('[Transcription] Silence detected, skipping (RMS:', rms.toFixed(5), ')');
+                // Increased threshold from 0.003 to 0.005 to reduce noise-induced hallucinations
+                if (rms < 0.005) {
+                    console.log('[Transcription] silence or noise (RMS:', rms.toFixed(5), ')');
                     return;
                 }
 
-                console.log('[Transcription] Sending', this.BUFFER_SECONDS, 's buffer (RMS:', rms.toFixed(5), ')');
+                console.log('[Transcription] Sending', this.BUFFER_SECONDS, 's buffer with', this.OVERLAP_SECONDS, 's overlap (RMS:', rms.toFixed(5), ')');
                 const wavBuffer = this.encodeWAV(rawData, this.TARGET_SAMPLE_RATE);
                 this.transcriptWs.send(wavBuffer);
             }
